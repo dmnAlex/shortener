@@ -42,7 +42,7 @@ func (h *ShortenerHandler) HandleShorten(c *gin.Context) {
 		return
 	}
 
-	shortURL := fmt.Sprintf("http://%s/%s", h.config.GetAddress(), shortID)
+	shortURL := fmt.Sprintf("http://%s/%s", h.config.GetShortenAddress(), shortID)
 	c.String(http.StatusCreated, shortURL)
 }
 

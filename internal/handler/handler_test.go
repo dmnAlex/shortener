@@ -18,7 +18,7 @@ import (
 
 const (
 	host = "localhost"
-	port = "8080"
+	port = 8080
 )
 
 type mockService struct {
@@ -60,7 +60,7 @@ func TestShortenerHanler_Shorten(t *testing.T) {
 			},
 			expectedStatus:      http.StatusCreated,
 			expectedContentType: "text/plain; charset=utf-8",
-			expectedBody:        fmt.Sprintf("http://%s:%s/EwHXdJfB", host, port),
+			expectedBody:        fmt.Sprintf("http://%s:%d/EwHXdJfB", host, port),
 		},
 		{
 			name:           "empty body",
@@ -86,7 +86,10 @@ func TestShortenerHanler_Shorten(t *testing.T) {
 				shortenFunc: tt.shortenFunc,
 			}
 
-			h := NewShortenerHandler(mockService, &config.Config{Host: host, Port: port})
+			h := NewShortenerHandler(mockService, &config.Config{
+				LaunchAddress:  config.Address{Host: host, Port: port},
+				ShortenAddress: config.Address{Host: host, Port: port},
+			})
 			w := httptest.NewRecorder()
 
 			c, _ := gin.CreateTestContext(w)
@@ -166,7 +169,10 @@ func TestShortenerHanler_Redirect(t *testing.T) {
 				expandFunc: tt.expandFunc,
 			}
 
-			h := NewShortenerHandler(mockService, &config.Config{Host: host, Port: port})
+			h := NewShortenerHandler(mockService, &config.Config{
+				LaunchAddress:  config.Address{Host: host, Port: port},
+				ShortenAddress: config.Address{Host: host, Port: port},
+			})
 			w := httptest.NewRecorder()
 
 			c, _ := gin.CreateTestContext(w)

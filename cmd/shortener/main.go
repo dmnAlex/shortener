@@ -17,5 +17,5 @@ func main() {
 	router := gin.Default()
 	handler.RegisterRoutes(router)
 
-	router.Run(cfg.GetAddress())
+	router.Run(cfg.GetLaunchAddress())
 }
