@@ -88,7 +88,7 @@ func TestShortenerHanler_Shorten(t *testing.T) {
 
 			h := NewShortenerHandler(mockService, &config.Config{
 				LaunchAddress:  config.Address{Host: host, Port: port},
-				ShortenAddress: config.Address{Host: host, Port: port},
+				ShortenAddress: fmt.Sprintf("http://%s:%d", host, port),
 			})
 			w := httptest.NewRecorder()
 
@@ -171,7 +171,7 @@ func TestShortenerHanler_Redirect(t *testing.T) {
 
 			h := NewShortenerHandler(mockService, &config.Config{
 				LaunchAddress:  config.Address{Host: host, Port: port},
-				ShortenAddress: config.Address{Host: host, Port: port},
+				ShortenAddress: fmt.Sprintf("http://%s:%d", host, port),
 			})
 			w := httptest.NewRecorder()
 

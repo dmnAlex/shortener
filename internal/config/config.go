@@ -39,16 +39,15 @@ func (a *Address) Set(s string) error {
 
 type Config struct {
 	LaunchAddress  Address
-	ShortenAddress Address
+	ShortenAddress string
 }
 
 func New() *Config {
 	cfg := &Config{
-		LaunchAddress:  Address{Host: defautHost, Port: defaultPort},
-		ShortenAddress: Address{Host: defautHost, Port: defaultPort},
+		LaunchAddress: Address{Host: defautHost, Port: defaultPort},
 	}
 	flag.Var(&cfg.LaunchAddress, "a", "launch address")
-	flag.Var(&cfg.ShortenAddress, "b", "shorten address")
+	flag.StringVar(&cfg.ShortenAddress, "b", fmt.Sprintf("http://%s:%d", defautHost, defaultPort), "shorten address")
 
 	flag.Parse()
 
@@ -57,8 +56,4 @@ func New() *Config {
 
 func (c *Config) GetLaunchAddress() string {
 	return fmt.Sprintf("%s:%d", c.LaunchAddress.Host, c.LaunchAddress.Port)
-}
-
-func (c *Config) GetShortenAddress() string {
-	return fmt.Sprintf("%s:%d", c.ShortenAddress.Host, c.ShortenAddress.Port)
 }
