@@ -3,13 +3,12 @@ package handler
 import (
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"strings"
 
 	"github.com/dmnAlex/shortener/internal/config"
 	"github.com/dmnAlex/shortener/internal/model/errx"
 	"github.com/dmnAlex/shortener/internal/service"
+	"github.com/gin-gonic/gin"
 )
 
 type ShortenerHandler struct {
@@ -24,54 +23,46 @@ func NewShortenerHandler(s service.URLService, cfg *config.Config) *ShortenerHan
 	}
 }
 
-func (h *ShortenerHandler) HandleShorten(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, errx.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
-		return
-	}
+func (h *ShortenerHandler) RegisterRoutes(router *gin.Engine) {
+	router.POST("", h.HandleShorten)
+	router.GET("/:id", h.HandleRedirect)
+}
 
-	body, err := io.ReadAll(r.Body)
+func (h *ShortenerHandler) HandleShorten(c *gin.Context) {
+	body, err := c.GetRawData()
 	if err != nil || len(body) == 0 {
-		http.Error(w, errx.ErrBadRequest.Error(), http.StatusBadRequest)
+		c.String(http.StatusBadRequest, errx.ErrBadRequest.Error())
 		return
 	}
 
 	originalURL := string(body)
 	shortID, err := h.service.Shorten(originalURL)
 	if err != nil {
-		http.Error(w, errx.ErrInternalError.Error(), http.StatusInternalServerError)
+		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 		return
 	}
 
 	shortURL := fmt.Sprintf("http://%s/%s", h.config.GetAddress(), shortID)
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(shortURL))
+	c.String(http.StatusCreated, shortURL)
 }
 
-func (h *ShortenerHandler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, errx.ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
+func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
+	shortID := c.Param("id")
+	if shortID == "" {
+		c.String(http.StatusBadRequest, errx.ErrBadRequest.Error())
 		return
 	}
 
-	path := strings.Trim(r.URL.Path, "/")
-	if path == "" {
-		http.Error(w, errx.ErrBadRequest.Error(), http.StatusBadRequest)
-		return
-	}
-
-	originalURL, err := h.service.Expand(path)
+	originalURL, err := h.service.Expand(shortID)
 	if err != nil {
 		if errors.Is(err, errx.ErrNotFound) {
-			http.Error(w, errx.ErrNotFound.Error(), http.StatusNotFound)
+			c.String(http.StatusNotFound, errx.ErrNotFound.Error())
 			return
 		}
 
-		http.Error(w, errx.ErrInternalError.Error(), http.StatusInternalServerError)
+		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 		return
 	}
 
-	w.Header().Set("Location", originalURL)
-	w.WriteHeader(http.StatusTemporaryRedirect)
+	c.Redirect(http.StatusTemporaryRedirect, originalURL)
 }

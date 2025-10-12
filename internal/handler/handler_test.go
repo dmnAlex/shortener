@@ -1,16 +1,17 @@
 package handler
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/dmnAlex/shortener/internal/config"
 	"github.com/dmnAlex/shortener/internal/model/errx"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,41 +53,30 @@ func TestShortenerHanler_Shorten(t *testing.T) {
 		expectedBody        string
 	}{
 		{
-			name:   "successful shortening",
-			method: http.MethodPost,
-			body:   "https://example.com",
+			name: "successful shortening",
+			body: "https://example.com",
 			shortenFunc: func(url string) (string, error) {
 				return "EwHXdJfB", nil
 			},
 			expectedStatus:      http.StatusCreated,
-			expectedContentType: "text/plain",
+			expectedContentType: "text/plain; charset=utf-8",
 			expectedBody:        fmt.Sprintf("http://%s:%s/EwHXdJfB", host, port),
 		},
 		{
-			name:           "wrong method",
-			method:         http.MethodGet,
-			body:           "https://example.com",
-			shortenFunc:    nil,
-			expectedStatus: http.StatusMethodNotAllowed,
-			expectedBody:   errx.ErrMethodNotAllowed.Error() + "\n",
-		},
-		{
 			name:           "empty body",
-			method:         http.MethodPost,
 			body:           "",
 			shortenFunc:    nil,
 			expectedStatus: http.StatusBadRequest,
-			expectedBody:   errx.ErrBadRequest.Error() + "\n",
+			expectedBody:   errx.ErrBadRequest.Error(),
 		},
 		{
-			name:   "internal error",
-			method: http.MethodPost,
-			body:   "https://example.com",
+			name: "service error",
+			body: "https://example.com",
 			shortenFunc: func(url string) (string, error) {
 				return "", errors.New("unexpected error")
 			},
 			expectedStatus: http.StatusInternalServerError,
-			expectedBody:   errx.ErrInternalError.Error() + "\n",
+			expectedBody:   errx.ErrInternalError.Error(),
 		},
 	}
 
@@ -97,9 +87,12 @@ func TestShortenerHanler_Shorten(t *testing.T) {
 			}
 
 			h := NewShortenerHandler(mockService, &config.Config{Host: host, Port: port})
-			r := httptest.NewRequest(tt.method, "/", bytes.NewBufferString(tt.body))
 			w := httptest.NewRecorder()
-			h.HandleShorten(w, r)
+
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.body))
+
+			h.HandleShorten(c)
 			res := w.Result()
 
 			require.Equal(t, tt.expectedStatus, res.StatusCode)
@@ -124,7 +117,7 @@ func TestShortenerHanler_Redirect(t *testing.T) {
 	tests := []struct {
 		name                string
 		method              string
-		path                string
+		shortID             string
 		expandFunc          func(string) (string, error)
 		expectedStatus      int
 		expectedContentType string
@@ -132,9 +125,8 @@ func TestShortenerHanler_Redirect(t *testing.T) {
 		expectedBody        string
 	}{
 		{
-			name:   "successful redirect",
-			method: http.MethodGet,
-			path:   "/EwHXdJfB",
+			name:    "successful redirect",
+			shortID: "EwHXdJfB",
 			expandFunc: func(shortID string) (string, error) {
 				return "https://example.com", nil
 			},
@@ -142,32 +134,29 @@ func TestShortenerHanler_Redirect(t *testing.T) {
 			expectedLocation: "https://example.com",
 		},
 		{
-			name:           "wrong method",
-			method:         http.MethodPost,
-			path:           "/EwHXdJfB",
-			expandFunc:     nil,
-			expectedStatus: http.StatusMethodNotAllowed,
-			expectedBody:   errx.ErrMethodNotAllowed.Error() + "\n",
-		},
-		{
-			name:   "not found",
-			method: http.MethodGet,
-			path:   "/nonexistent",
+			name:    "not found",
+			shortID: "nonexistent",
 			expandFunc: func(shortID string) (string, error) {
 				return "", errx.ErrNotFound
 			},
 			expectedStatus: http.StatusNotFound,
-			expectedBody:   errx.ErrNotFound.Error() + "\n",
+			expectedBody:   errx.ErrNotFound.Error(),
 		},
 		{
-			name:   "internal error",
-			method: http.MethodGet,
-			path:   "/EwHXdJfB",
+			name:           "empty id",
+			shortID:        "",
+			expandFunc:     nil,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   errx.ErrBadRequest.Error(),
+		},
+		{
+			name:    "service error",
+			shortID: "EwHXdJfB",
 			expandFunc: func(shortID string) (string, error) {
 				return "", errors.New("unexpected error")
 			},
 			expectedStatus: http.StatusInternalServerError,
-			expectedBody:   errx.ErrInternalError.Error() + "\n",
+			expectedBody:   errx.ErrInternalError.Error(),
 		},
 	}
 
@@ -178,9 +167,13 @@ func TestShortenerHanler_Redirect(t *testing.T) {
 			}
 
 			h := NewShortenerHandler(mockService, &config.Config{Host: host, Port: port})
-			r := httptest.NewRequest(tt.method, tt.path, nil)
 			w := httptest.NewRecorder()
-			h.HandleRedirect(w, r)
+
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodGet, "/"+tt.shortID, nil)
+			c.Params = []gin.Param{{Key: "id", Value: tt.shortID}}
+
+			h.HandleRedirect(c)
 			res := w.Result()
 
 			require.Equal(t, tt.expectedStatus, res.StatusCode)
