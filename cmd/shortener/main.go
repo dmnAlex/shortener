@@ -5,7 +5,6 @@ import (
 	"github.com/dmnAlex/shortener/internal/handler"
 	"github.com/dmnAlex/shortener/internal/repository"
 	"github.com/dmnAlex/shortener/internal/service"
-	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -13,9 +12,7 @@ func main() {
 	repo := repository.NewInMemoryRepo()
 	service := service.NewURLService(repo)
 	handler := handler.NewShortenerHandler(service, cfg)
+	router := newRouter(handler)
 
-	router := gin.Default()
-	handler.RegisterRoutes(router)
-
-	router.Run(cfg.GetLaunchAddress())
+	router.Run(cfg.LaunchAddress.String())
 }

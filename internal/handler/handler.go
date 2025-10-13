@@ -23,11 +23,6 @@ func NewShortenerHandler(s service.URLService, cfg *config.Config) *ShortenerHan
 	}
 }
 
-func (h *ShortenerHandler) RegisterRoutes(router *gin.Engine) {
-	router.POST("", h.HandleShorten)
-	router.GET("/:id", h.HandleRedirect)
-}
-
 func (h *ShortenerHandler) HandleShorten(c *gin.Context) {
 	body, err := c.GetRawData()
 	if err != nil || len(body) == 0 {

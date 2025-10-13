@@ -53,7 +53,3 @@ func New() *Config {
 
 	return cfg
 }
-
-func (c *Config) GetLaunchAddress() string {
-	return fmt.Sprintf("%s:%d", c.LaunchAddress.Host, c.LaunchAddress.Port)
-}
