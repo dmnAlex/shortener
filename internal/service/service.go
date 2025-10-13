@@ -21,8 +21,11 @@ func NewURLService(repo repository.URLRepository) URLService {
 }
 
 func (s *urlService) Shorten(originalURL string) (string, error) {
-	shortID := generateShortID()
-	err := s.repo.Save(shortID, originalURL)
+	shortID, err := generateShortID()
+	if err != nil {
+		return "", err
+	}
+	err = s.repo.Save(shortID, originalURL)
 	return shortID, err
 }
 
@@ -30,8 +33,12 @@ func (s *urlService) Expand(shortID string) (string, error) {
 	return s.repo.Find(shortID)
 }
 
-func generateShortID() string {
+func generateShortID() (string, error) {
 	bytes := make([]byte, 6)
-	rand.Read(bytes)
-	return base64.URLEncoding.EncodeToString(bytes)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.URLEncoding.EncodeToString(bytes), nil
 }

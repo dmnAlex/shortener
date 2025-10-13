@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	defautHost  = "localhost"
+	defaultHost = "localhost"
 	defaultPort = 8080
 )
 
@@ -44,10 +44,10 @@ type Config struct {
 
 func New() *Config {
 	cfg := &Config{
-		LaunchAddress: Address{Host: defautHost, Port: defaultPort},
+		LaunchAddress: Address{Host: defaultHost, Port: defaultPort},
 	}
 	flag.Var(&cfg.LaunchAddress, "a", "launch address")
-	flag.StringVar(&cfg.ShortenAddress, "b", fmt.Sprintf("http://%s:%d", defautHost, defaultPort), "shorten address")
+	flag.StringVar(&cfg.ShortenAddress, "b", fmt.Sprintf("http://%s:%d", defaultHost, defaultPort), "shorten address")
 
 	flag.Parse()
 

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+
 	"github.com/dmnAlex/shortener/internal/config"
 	"github.com/dmnAlex/shortener/internal/handler"
 	"github.com/dmnAlex/shortener/internal/repository"
@@ -14,5 +16,7 @@ func main() {
 	handler := handler.NewShortenerHandler(service, cfg)
 	router := newRouter(handler)
 
-	router.Run(cfg.LaunchAddress.String())
+	if err := router.Run(cfg.LaunchAddress.String()); err != nil {
+		log.Fatalf("router run error: %v", err)
+	}
 }

@@ -42,7 +42,7 @@ func (m *mockService) Expand(shortID string) (string, error) {
 	return m.expandFunc(shortID)
 }
 
-func TestShortenerHanler_Shorten(t *testing.T) {
+func TestShortenerHandler_Shorten(t *testing.T) {
 	tests := []struct {
 		name                string
 		method              string
@@ -116,7 +116,7 @@ func TestShortenerHanler_Shorten(t *testing.T) {
 	}
 }
 
-func TestShortenerHanler_Redirect(t *testing.T) {
+func TestShortenerHandler_Redirect(t *testing.T) {
 	tests := []struct {
 		name                string
 		method              string
