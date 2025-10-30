@@ -10,7 +10,11 @@ import (
 )
 
 func main() {
-	cfg := config.New()
+	cfg, err := config.New()
+	if err != nil {
+		log.Fatalf("config error: %v", err)
+	}
+
 	repo := repository.NewInMemoryRepo()
 	service := service.NewURLService(repo)
 	handler := handler.NewShortenerHandler(service, cfg)

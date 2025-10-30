@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/caarlos0/env"
 )
 
 const (
@@ -37,12 +39,16 @@ func (a *Address) Set(s string) error {
 	return nil
 }
 
-type Config struct {
-	LaunchAddress  Address
-	ShortenAddress string
+func (a *Address) UnmarshalText(text []byte) error {
+	return a.Set(string(text))
 }
 
-func New() *Config {
+type Config struct {
+	LaunchAddress  Address `env:"SERVER_ADDRESS"`
+	ShortenAddress string  `env:"BASE_URL"`
+}
+
+func New() (*Config, error) {
 	cfg := &Config{
 		LaunchAddress: Address{Host: defaultHost, Port: defaultPort},
 	}
@@ -51,5 +57,9 @@ func New() *Config {
 
 	flag.Parse()
 
-	return cfg
+	if err := env.Parse(cfg); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
 }
