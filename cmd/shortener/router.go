@@ -2,14 +2,16 @@ package main
 
 import (
 	"github.com/dmnAlex/shortener/internal/handler"
+	"github.com/dmnAlex/shortener/internal/logger"
 	"github.com/gin-gonic/gin"
 )
 
 func newRouter(h *handler.ShortenerHandler) *gin.Engine {
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
 
-	r.POST("", h.HandleShorten)
-	r.GET("/:id", h.HandleRedirect)
+	r.POST("", logger.RequestLogger(h.HandleShorten))
+	r.GET("/:id", logger.RequestLogger(h.HandleRedirect))
 
 	return r
 }

@@ -46,6 +46,7 @@ func (a *Address) UnmarshalText(text []byte) error {
 type Config struct {
 	LaunchAddress  Address `env:"SERVER_ADDRESS"`
 	ShortenAddress string  `env:"BASE_URL"`
+	LogLevel       string  `env:"LOG_LEVEL"`
 }
 
 func New() (*Config, error) {
@@ -54,6 +55,7 @@ func New() (*Config, error) {
 	}
 	flag.Var(&cfg.LaunchAddress, "a", "launch address")
 	flag.StringVar(&cfg.ShortenAddress, "b", fmt.Sprintf("http://%s:%d", defaultHost, defaultPort), "shorten address")
+	flag.StringVar(&cfg.LogLevel, "l", "info", "log level")
 
 	flag.Parse()
 
