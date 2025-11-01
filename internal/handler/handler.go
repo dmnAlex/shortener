@@ -43,7 +43,7 @@ func (h *ShortenerHandler) HandleShorten(c *gin.Context) {
 	c.String(http.StatusCreated, shortURL)
 }
 
-func (h *ShortenerHandler) HandleApiShorten(c *gin.Context) {
+func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 	body, err := c.GetRawData()
 	if err != nil || len(body) == 0 {
 		c.String(http.StatusBadRequest, errx.ErrBadRequest.Error())

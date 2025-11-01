@@ -118,7 +118,7 @@ func TestShortenerHandler_Shorten(t *testing.T) {
 	}
 }
 
-func TestShortenerHandler_ApiShorten(t *testing.T) {
+func TestShortenerHandler_APIShorten(t *testing.T) {
 	tests := []struct {
 		name                string
 		body                string
@@ -198,7 +198,7 @@ func TestShortenerHandler_ApiShorten(t *testing.T) {
 			c.Request = httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(tt.body))
 			c.Request.Header.Set("Content-Type", "application/json")
 
-			h.HandleApiShorten(c)
+			h.HandleAPIShorten(c)
 			res := w.Result()
 
 			require.Equal(t, tt.expectedStatus, res.StatusCode)
