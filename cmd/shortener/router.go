@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/dmnAlex/shortener/internal/gzip"
 	"github.com/dmnAlex/shortener/internal/handler"
 	"github.com/dmnAlex/shortener/internal/logger"
 	"github.com/gin-gonic/gin"
@@ -9,10 +10,12 @@ import (
 func newRouter(h *handler.ShortenerHandler) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
+	r.Use(logger.LoggerMiddleware())
+	r.Use(gzip.GzipMiddleware())
 
-	r.POST("", logger.RequestLogger(h.HandleShorten))
-	r.GET("/:id", logger.RequestLogger(h.HandleRedirect))
-	r.POST("/api/shorten", logger.RequestLogger(h.HandleAPIShorten))
+	r.POST("", h.HandleShorten)
+	r.GET("/:id", h.HandleRedirect)
+	r.POST("/api/shorten", h.HandleAPIShorten)
 
 	return r
 }

@@ -45,16 +45,18 @@ func (cw *customWriter) WriteHeader(statusCode int) {
 	cw.responseData.status = statusCode
 }
 
-func RequestLogger(h gin.HandlerFunc) gin.HandlerFunc {
-	return gin.HandlerFunc(func(ctx *gin.Context) {
+func LoggerMiddleware() gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
 		start := time.Now
 		rd := &responseData{status: 0, size: 0}
-		cw := &customWriter{ResponseWriter: ctx.Writer, responseData: rd}
-		ctx.Writer = cw
-		h(ctx)
+		cw := &customWriter{ResponseWriter: c.Writer, responseData: rd}
+		c.Writer = cw
+
+		c.Next()
+
 		Log.Info("got incoming HTTP request",
-			zap.String("uri", ctx.Request.URL.String()),
-			zap.String("method", ctx.Request.Method),
+			zap.String("uri", c.Request.URL.String()),
+			zap.String("method", c.Request.Method),
 			zap.String("duration", time.Since(start()).String()),
 			zap.String("status", strconv.Itoa(rd.status)),
 			zap.String("size", strconv.Itoa(rd.size)),
