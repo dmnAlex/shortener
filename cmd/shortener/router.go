@@ -11,7 +11,8 @@ func newRouter(h *handler.ShortenerHandler) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(logger.LoggerMiddleware())
-	r.Use(gzip.GzipMiddleware())
+	r.Use(gzip.GzipDecompressMiddleware())
+	r.Use(gzip.GzipCompressMiddleware())
 
 	r.POST("", h.HandleShorten)
 	r.GET("/:id", h.HandleRedirect)

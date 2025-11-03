@@ -29,12 +29,9 @@ func (g *gzipWriter) Close() error {
 	return g.w.Close()
 }
 
-func GzipMiddleware() gin.HandlerFunc {
+func GzipDecompressMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		sendsGzip := strings.Contains(c.GetHeader("Content-Encoding"), "gzip")
-		supportsGzip := strings.Contains(c.GetHeader("Accept-Encoding"), "gzip")
-
-		if sendsGzip {
+		if strings.Contains(c.GetHeader("Content-Encoding"), "gzip") {
 			reader, err := gzip.NewReader(c.Request.Body)
 			if err != nil {
 				c.AbortWithError(http.StatusBadRequest, errx.ErrBadRequest)
@@ -45,7 +42,13 @@ func GzipMiddleware() gin.HandlerFunc {
 			c.Request.Body = reader
 		}
 
-		if supportsGzip {
+		c.Next()
+	}
+}
+
+func GzipCompressMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") {
 			contentType := c.GetHeader("Content-Type")
 			shouldCompress := strings.Contains(contentType, "application/json") ||
 				strings.Contains(contentType, "text/html")
