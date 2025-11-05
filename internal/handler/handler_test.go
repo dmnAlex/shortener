@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -111,6 +113,119 @@ func TestShortenerHandler_Shorten(t *testing.T) {
 				require.NoError(t, err)
 
 				assert.Equal(t, tt.expectedBody, string(body))
+			}
+		})
+	}
+}
+
+func TestShortenerHandler_APIShorten(t *testing.T) {
+	tests := []struct {
+		name                string
+		body                string
+		shortenFunc         func(string) (string, error)
+		expectedStatus      int
+		expectedContentType string
+		expectedBody        string
+	}{
+		{
+			name: "successful shortening with JSON",
+			body: `{"url": "https://example.com"}`,
+			shortenFunc: func(url string) (string, error) {
+				return "EwHXdJfB", nil
+			},
+			expectedStatus:      http.StatusCreated,
+			expectedContentType: "application/json",
+			expectedBody:        `{"result":"http://` + host + `:` + strconv.Itoa(port) + `/EwHXdJfB"}`,
+		},
+		{
+			name:           "empty body",
+			body:           "",
+			shortenFunc:    nil,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   errx.ErrBadRequest.Error(),
+		},
+		{
+			name: "invalid JSON",
+			body: `{"url": "https://example.com"`,
+			shortenFunc: func(url string) (string, error) {
+				return "EwHXdJfB", nil
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   errx.ErrBadRequest.Error(),
+		},
+		{
+			name: "missing url field",
+			body: `{"not_url": "https://example.com"}`,
+			shortenFunc: func(url string) (string, error) {
+				return "EwHXdJfB", nil
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   errx.ErrBadRequest.Error(),
+		},
+		{
+			name: "empty url field",
+			body: `{"url": ""}`,
+			shortenFunc: func(url string) (string, error) {
+				return "EwHXdJfB", nil
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   errx.ErrBadRequest.Error(),
+		},
+		{
+			name: "service error",
+			body: `{"url": "https://example.com"}`,
+			shortenFunc: func(url string) (string, error) {
+				return "", errors.New("unexpected error")
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   errx.ErrInternalError.Error(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := &mockService{
+				shortenFunc: tt.shortenFunc,
+			}
+
+			h := NewShortenerHandler(mockService, &config.Config{
+				LaunchAddress:  config.Address{Host: host, Port: port},
+				ShortenAddress: fmt.Sprintf("http://%s:%d", host, port),
+			})
+			w := httptest.NewRecorder()
+
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(tt.body))
+			c.Request.Header.Set("Content-Type", "application/json")
+
+			h.HandleAPIShorten(c)
+			res := w.Result()
+
+			require.Equal(t, tt.expectedStatus, res.StatusCode)
+
+			if tt.expectedContentType != "" {
+				assert.Equal(t, tt.expectedContentType, res.Header.Get("Content-Type"))
+			}
+
+			if tt.expectedBody != "" {
+				body, err := io.ReadAll(res.Body)
+				require.NoError(t, err)
+				err = res.Body.Close()
+				require.NoError(t, err)
+
+				if tt.expectedContentType == "application/json" {
+					var expectedJSON, actualJSON interface{}
+
+					err = json.Unmarshal([]byte(tt.expectedBody), &expectedJSON)
+					require.NoError(t, err)
+
+					err = json.Unmarshal(body, &actualJSON)
+					require.NoError(t, err)
+
+					assert.Equal(t, expectedJSON, actualJSON)
+				} else {
+					assert.Equal(t, tt.expectedBody, string(body))
+				}
 			}
 		})
 	}

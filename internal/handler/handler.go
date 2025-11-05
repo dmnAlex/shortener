@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/dmnAlex/shortener/internal/config"
+	"github.com/dmnAlex/shortener/internal/model"
 	"github.com/dmnAlex/shortener/internal/model/errx"
 	"github.com/dmnAlex/shortener/internal/service"
 	"github.com/gin-gonic/gin"
@@ -31,14 +33,51 @@ func (h *ShortenerHandler) HandleShorten(c *gin.Context) {
 	}
 
 	originalURL := string(body)
-	shortID, err := h.service.Shorten(originalURL)
+	shortURL, err := h.shortenURL(originalURL)
 	if err != nil {
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 		return
 	}
 
-	shortURL := fmt.Sprintf("%s/%s", h.config.ShortenAddress, shortID)
 	c.String(http.StatusCreated, shortURL)
+}
+
+func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
+	body, err := c.GetRawData()
+	if err != nil || len(body) == 0 {
+		c.String(http.StatusBadRequest, errx.ErrBadRequest.Error())
+		return
+	}
+
+	var req model.ShortenRequest
+
+	if err := json.Unmarshal(body, &req); err != nil || req.URL == "" {
+		c.String(http.StatusBadRequest, errx.ErrBadRequest.Error())
+		return
+	}
+
+	shortURL, err := h.shortenURL(req.URL)
+	if err != nil {
+		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+		return
+	}
+
+	res, err := json.Marshal(model.ShortenResponse{Result: shortURL})
+	if err != nil {
+		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+		return
+	}
+
+	c.Data(http.StatusCreated, "application/json", res)
+}
+
+func (h *ShortenerHandler) shortenURL(url string) (string, error) {
+	shortID, err := h.service.Shorten(url)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s/%s", h.config.ShortenAddress, shortID), nil
 }
 
 func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
