@@ -48,6 +48,7 @@ type Config struct {
 	ShortenAddress  string  `env:"BASE_URL"`
 	LogLevel        string  `env:"LOG_LEVEL"`
 	FileStoragePath string  `env:"FILE_STORAGE_PATH"`
+	DatabaseDSN     string  `env:"DATABASE_DSN"`
 }
 
 func New() (*Config, error) {
@@ -58,6 +59,7 @@ func New() (*Config, error) {
 	flag.StringVar(&cfg.ShortenAddress, "b", fmt.Sprintf("http://%s:%d", defaultHost, defaultPort), "shorten address")
 	flag.StringVar(&cfg.LogLevel, "l", "info", "log level")
 	flag.StringVar(&cfg.FileStoragePath, "f", "./storage.json", "file storage path")
+	flag.StringVar(&cfg.DatabaseDSN, "d", "", "database dsn")
 
 	flag.Parse()
 

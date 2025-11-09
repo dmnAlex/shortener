@@ -26,6 +26,7 @@ const (
 type mockService struct {
 	shortenFunc func(url string) (string, error)
 	expandFunc  func(shortID string) (string, error)
+	pingFunc    func() error
 }
 
 func (m *mockService) Shorten(url string) (string, error) {
@@ -42,6 +43,10 @@ func (m *mockService) Expand(shortID string) (string, error) {
 	}
 
 	return m.expandFunc(shortID)
+}
+
+func (m *mockService) Ping() error {
+	return nil
 }
 
 func TestShortenerHandler_Shorten(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 type URLService interface {
 	Shorten(originalURL string) (string, error)
 	Expand(shortID string) (string, error)
+	Ping() error
 }
 
 type urlService struct {
@@ -41,4 +42,8 @@ func generateShortID() (string, error) {
 	}
 
 	return base64.URLEncoding.EncodeToString(bytes), nil
+}
+
+func (s *urlService) Ping() error {
+	return nil
 }

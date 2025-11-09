@@ -20,13 +20,21 @@ func main() {
 		log.Fatalf("init logger error: %v", err)
 	}
 
+	var pgRepo repository.URLRepository
+	if cfg.DatabaseDSN != "" {
+		pgRepo, err = repository.NewPostgresRepo(cfg.DatabaseDSN)
+		if err != nil {
+			log.Fatalf("pg repo error: %v", err)
+		}
+	}
+
 	repo, err := repository.NewFileRepo(cfg.FileStoragePath)
 	if err != nil {
 		log.Fatalf("repo error: %v", err)
 	}
 	service := service.NewURLService(repo)
 	handler := handler.NewShortenerHandler(service, cfg)
-	router := newRouter(handler)
+	router := newRouter(handler, pgRepo)
 
 	if err := router.Run(cfg.LaunchAddress.String()); err != nil {
 		log.Fatalf("router run error: %v", err)

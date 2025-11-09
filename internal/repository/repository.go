@@ -13,6 +13,7 @@ import (
 type URLRepository interface {
 	Save(shortID, url string) error
 	Find(shortID string) (string, error)
+	Ping() error
 }
 
 type fileRepo struct {
@@ -100,4 +101,8 @@ func (r *fileRepo) Find(shortID string) (string, error) {
 	}
 
 	return url, nil
+}
+
+func (r *fileRepo) Ping() error {
+	return nil
 }
