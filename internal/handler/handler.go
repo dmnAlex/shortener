@@ -100,3 +100,12 @@ func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
 
 	c.Redirect(http.StatusTemporaryRedirect, originalURL)
 }
+
+func (h *ShortenerHandler) HandlePing(c *gin.Context) {
+	if err := h.service.Ping(); err != nil {
+		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+		return
+	}
+
+	c.String(http.StatusOK, "OK")
+}

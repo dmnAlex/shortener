@@ -32,6 +32,10 @@ func NewFileRepo(path string) (URLRepository, error) {
 		nextUUID: 1,
 	}
 
+	if r.path == "" {
+		return r, nil
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -56,6 +60,10 @@ func NewFileRepo(path string) (URLRepository, error) {
 }
 
 func (r *fileRepo) saveToFile() error {
+	if r.path == "" {
+		return nil
+	}
+
 	data, err := json.Marshal(r.records)
 	if err != nil {
 		return err

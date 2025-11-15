@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"github.com/dmnAlex/shortener/internal/config"
@@ -8,9 +9,13 @@ import (
 	"github.com/dmnAlex/shortener/internal/logger"
 	"github.com/dmnAlex/shortener/internal/repository"
 	"github.com/dmnAlex/shortener/internal/service"
+	"github.com/dmnAlex/shortener/internal/storage/pg"
 )
 
 func main() {
+	globalCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	cfg, err := config.New()
 	if err != nil {
 		log.Fatalf("config error: %v", err)
@@ -20,21 +25,29 @@ func main() {
 		log.Fatalf("init logger error: %v", err)
 	}
 
-	var pgRepo repository.URLRepository
+	var repo repository.URLRepository
 	if cfg.DatabaseDSN != "" {
-		pgRepo, err = repository.NewPostgresRepo(cfg.DatabaseDSN)
+		logger.Log.Info("using pg database")
+		db, err := pg.New(globalCtx, cfg.DatabaseDSN, "migrations")
+		if err != nil {
+			log.Fatalf("db error: %v", err)
+		}
+
+		repo, err = repository.NewPostgresRepo(db)
 		if err != nil {
 			log.Fatalf("pg repo error: %v", err)
 		}
+	} else {
+		logger.Log.Info("using file database")
+		repo, err = repository.NewFileRepo(cfg.FileStoragePath)
+		if err != nil {
+			log.Fatalf("file repo error: %v", err)
+		}
 	}
 
-	repo, err := repository.NewFileRepo(cfg.FileStoragePath)
-	if err != nil {
-		log.Fatalf("repo error: %v", err)
-	}
 	service := service.NewURLService(repo)
 	handler := handler.NewShortenerHandler(service, cfg)
-	router := newRouter(handler, pgRepo)
+	router := newRouter(handler)
 
 	if err := router.Run(cfg.LaunchAddress.String()); err != nil {
 		log.Fatalf("router run error: %v", err)

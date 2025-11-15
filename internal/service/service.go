@@ -45,5 +45,5 @@ func generateShortID() (string, error) {
 }
 
 func (s *urlService) Ping() error {
-	return nil
+	return s.repo.Ping()
 }
