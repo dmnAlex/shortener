@@ -4,3 +4,5 @@ CREATE TABLE IF NOT EXISTS urls (
     original_url TEXT NOT NULL,
     created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)::BIGINT
 );
+
+CREATE INDEX idx_urls_short_id ON urls (short_id);

@@ -49,17 +49,12 @@ func GzipDecompressMiddleware() gin.HandlerFunc {
 func GzipCompressMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") {
-			contentType := c.GetHeader("Content-Type")
-			shouldCompress := strings.Contains(contentType, "application/json") ||
-				strings.Contains(contentType, "text/html")
 
-			if shouldCompress {
-				gw := newGzipWriter(c.Writer)
-				defer gw.Close()
-				c.Writer = gw
+			gw := newGzipWriter(c.Writer)
+			defer gw.Close()
+			c.Writer = gw
 
-				c.Header("Content-Encoding", "gzip")
-			}
+			c.Header("Content-Encoding", "gzip")
 		}
 
 		c.Next()

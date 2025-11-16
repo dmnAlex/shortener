@@ -28,15 +28,13 @@ func main() {
 	var repo repository.URLRepository
 	if cfg.DatabaseDSN != "" {
 		logger.Log.Info("using pg database")
-		db, err := pg.New(globalCtx, cfg.DatabaseDSN, "migrations")
+		db, err := pg.New(globalCtx, cfg.DatabaseDSN, cfg.MigrationsPath)
 		if err != nil {
 			log.Fatalf("db error: %v", err)
 		}
 
-		repo, err = repository.NewPostgresRepo(db)
-		if err != nil {
-			log.Fatalf("pg repo error: %v", err)
-		}
+		repo = repository.NewPostgresRepo(db)
+
 	} else {
 		logger.Log.Info("using file database")
 		repo, err = repository.NewFileRepo(cfg.FileStoragePath)

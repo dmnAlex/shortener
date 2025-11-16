@@ -49,6 +49,7 @@ type Config struct {
 	LogLevel        string  `env:"LOG_LEVEL"`
 	FileStoragePath string  `env:"FILE_STORAGE_PATH"`
 	DatabaseDSN     string  `env:"DATABASE_DSN"`
+	MigrationsPath  string  `env:"MIGRATIONS_PATH"`
 }
 
 func New() (*Config, error) {
@@ -60,6 +61,7 @@ func New() (*Config, error) {
 	flag.StringVar(&cfg.LogLevel, "l", "info", "log level")
 	flag.StringVar(&cfg.FileStoragePath, "f", "./storage.json", "file storage path")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "database dsn")
+	flag.StringVar(&cfg.MigrationsPath, "m", "./migrations", "migrations path")
 
 	flag.Parse()
 

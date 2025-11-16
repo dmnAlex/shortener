@@ -80,6 +80,26 @@ func (h *ShortenerHandler) shortenURL(url string) (string, error) {
 	return fmt.Sprintf("%s/%s", h.config.ShortenAddress, shortID), nil
 }
 
+func (h *ShortenerHandler) HandleAPIShortenBatch(c *gin.Context) {
+	var req []model.ShortenBatchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.String(http.StatusBadRequest, errx.ErrBadRequest.Error())
+		return
+	}
+
+	res, err := h.service.ShortenBatch(req)
+	if err != nil {
+		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+		return
+	}
+
+	for i := range res {
+		res[i].ShortURL = fmt.Sprintf("%s/%s", h.config.ShortenAddress, res[i].ShortURL)
+	}
+
+	c.JSON(http.StatusCreated, res)
+}
+
 func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
 	shortID := c.Param("id")
 	if shortID == "" {
