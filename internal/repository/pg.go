@@ -23,6 +23,9 @@ func NewPostgresRepo(db *pg.DB) *postgresRepo {
 const saveSQL = `
 	INSERT INTO urls (short_id, original_url)
 	VALUES (@short_id, @original_url)
+	ON CONFLICT (original_url) DO UPDATE
+	SET original_url = @original_url
+	RETURNING short_id
 `
 
 func (r *postgresRepo) Save(url string) (string, error) {
@@ -36,18 +39,13 @@ func (r *postgresRepo) Save(url string) (string, error) {
 		"original_url": url,
 	}
 
-	res, err := r.db.Exec(saveSQL, args)
-	if err != nil {
+	var savedShortID string
+	if err := r.db.QueryRow(saveSQL, args, &savedShortID); err != nil {
 		return "", err
 	}
 
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return "", err
-	}
-
-	if affected == 0 {
-		return "", errx.ErrAlreadyExists
+	if shortID != savedShortID {
+		return savedShortID, errx.ErrConflict
 	}
 
 	return shortID, nil
@@ -58,7 +56,7 @@ func (r *postgresRepo) SaveBatch(batch []model.ShortenBatchRequest) ([]model.Sho
 	if err := r.DoTx(func(rTx *postgresRepo) error {
 		for _, item := range batch {
 			shortID, err := rTx.Save(item.OriginalURL)
-			if err != nil {
+			if err != nil && !errors.Is(err, errx.ErrConflict) {
 				return err
 			}
 

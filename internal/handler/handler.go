@@ -33,13 +33,18 @@ func (h *ShortenerHandler) HandleShorten(c *gin.Context) {
 	}
 
 	originalURL := string(body)
+	status := http.StatusCreated
 	shortURL, err := h.shortenURL(originalURL)
 	if err != nil {
-		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
-		return
+		if !errors.Is(err, errx.ErrConflict) {
+			c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+			return
+		}
+
+		status = http.StatusConflict
 	}
 
-	c.String(http.StatusCreated, shortURL)
+	c.String(status, shortURL)
 }
 
 func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
@@ -56,10 +61,15 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 		return
 	}
 
+	status := http.StatusCreated
 	shortURL, err := h.shortenURL(req.URL)
 	if err != nil {
-		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
-		return
+		if !errors.Is(err, errx.ErrConflict) {
+			c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+			return
+		}
+
+		status = http.StatusConflict
 	}
 
 	res, err := json.Marshal(model.ShortenResponse{Result: shortURL})
@@ -68,16 +78,12 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 		return
 	}
 
-	c.Data(http.StatusCreated, "application/json", res)
+	c.Data(status, "application/json", res)
 }
 
 func (h *ShortenerHandler) shortenURL(url string) (string, error) {
 	shortID, err := h.service.Shorten(url)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%s/%s", h.config.ShortenAddress, shortID), nil
+	return fmt.Sprintf("%s/%s", h.config.ShortenAddress, shortID), err
 }
 
 func (h *ShortenerHandler) HandleAPIShortenBatch(c *gin.Context) {

@@ -15,8 +15,8 @@ type ShortenResponse struct {
 }
 
 type ShortenBatchRequest struct {
-	CorrelationID string `json:"correlation_id"`
-	OriginalURL   string `json:"original_url"`
+	CorrelationID string `json:"correlation_id" binding:"required"`
+	OriginalURL   string `json:"original_url" binding:"required"`
 }
 
 type ShortenBatchResponse struct {
