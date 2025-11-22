@@ -54,6 +54,10 @@ func applyMigrations(db *sql.DB, migrationsPath string) error {
 	return nil
 }
 
+func (db *DB) Close() error {
+	return db.db.Close()
+}
+
 func (db *DB) WithCtx(ctx context.Context) *DB {
 	return &DB{
 		stopCtx: ctx,

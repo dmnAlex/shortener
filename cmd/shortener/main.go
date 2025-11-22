@@ -32,6 +32,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("db error: %v", err)
 		}
+		defer db.Close()
 
 		repo = repository.NewPostgresRepo(db)
 
