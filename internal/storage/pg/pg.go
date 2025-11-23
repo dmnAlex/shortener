@@ -2,144 +2,147 @@ package pg
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
+	pgxdriver "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 type DB struct {
 	stopCtx context.Context
-	db      *sql.DB
-	tx      *sql.Tx
+	pool    *pgxpool.Pool
+	tx      pgx.Tx
 }
 
 func New(ctx context.Context, dsn, migrationsPath string) (*DB, error) {
-	db, err := sql.Open("pgx", dsn)
+	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		return nil, err
 	}
-
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
 		return nil, err
 	}
-
-	if err := applyMigrations(db, migrationsPath); err != nil {
-		db.Close()
+	if err := applyMigrations(pool, migrationsPath); err != nil {
+		pool.Close()
 		return nil, err
 	}
-
-	return &DB{stopCtx: ctx, db: db}, nil
+	return &DB{stopCtx: ctx, pool: pool}, nil
 }
 
-func applyMigrations(db *sql.DB, migrationsPath string) error {
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
+func applyMigrations(pool *pgxpool.Pool, migrationsPath string) error {
+	sqlDB := stdlib.OpenDBFromPool(pool)
+	defer sqlDB.Close()
+
+	driver, err := pgxdriver.WithInstance(sqlDB, &pgxdriver.Config{})
 	if err != nil {
 		return err
 	}
-
-	m, err := migrate.NewWithDatabaseInstance("file://"+migrationsPath, "shortener", driver)
+	m, err := migrate.NewWithDatabaseInstance("file://"+migrationsPath, "postgres", driver)
 	if err != nil {
 		return err
 	}
-
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return err
 	}
-
 	return nil
 }
 
-func (db *DB) Close() error {
-	return db.db.Close()
+func (db *DB) Close() {
+	if db.tx != nil {
+		db.tx.Rollback(db.stopCtx)
+	}
+	db.pool.Close()
 }
 
 func (db *DB) WithCtx(ctx context.Context) *DB {
 	return &DB{
 		stopCtx: ctx,
-		db:      db.db,
+		pool:    db.pool,
 		tx:      db.tx,
 	}
 }
 
-func (db *DB) DoTx(f func(*DB) error, opts ...*sql.TxOptions) error {
+func (db *DB) DoTx(f func(*DB) error, opts ...*pgx.TxOptions) error {
 	if db.tx != nil {
 		return f(db)
 	}
-
-	var opt *sql.TxOptions
+	var opt *pgx.TxOptions
 	if len(opts) > 0 {
 		opt = opts[0]
 	}
-
 	if opt == nil {
-		opt = &sql.TxOptions{
-			Isolation: sql.LevelReadCommitted,
+		opt = &pgx.TxOptions{
+			IsoLevel: pgx.ReadCommitted,
 		}
 	}
-
-	tx, err := db.db.BeginTx(db.stopCtx, opt)
+	tx, err := db.pool.BeginTx(db.stopCtx, *opt)
 	if err != nil {
 		return err
 	}
-
 	txDB := &DB{
 		stopCtx: db.stopCtx,
-		db:      db.db,
+		pool:    db.pool,
 		tx:      tx,
 	}
-
 	if err := f(txDB); err != nil {
-		tx.Rollback()
+		tx.Rollback(db.stopCtx)
 		return err
 	}
-
-	return tx.Commit()
+	return tx.Commit(db.stopCtx)
 }
 
-func (db *DB) Exec(query string, args ...any) (sql.Result, error) {
+func (db *DB) Exec(query string, args ...any) (pgconn.CommandTag, error) {
 	if db.tx != nil {
-		return db.tx.ExecContext(db.stopCtx, query, args...)
+		return db.tx.Exec(db.stopCtx, query, args...)
 	}
-	return db.db.ExecContext(db.stopCtx, query, args...)
+	return db.pool.Exec(db.stopCtx, query, args...)
 }
 
-func (db *DB) Query(query string, args pgx.NamedArgs, f func(*sql.Rows) error) error {
+func (db *DB) Query(query string, args pgx.NamedArgs, f func(pgx.Rows) error) error {
 	var (
-		rows *sql.Rows
+		rows pgx.Rows
 		err  error
 	)
 	if db.tx != nil {
-		rows, err = db.tx.QueryContext(db.stopCtx, query, args)
+		rows, err = db.tx.Query(db.stopCtx, query, args)
 	} else {
-		rows, err = db.db.QueryContext(db.stopCtx, query, args)
+		rows, err = db.pool.Query(db.stopCtx, query, args)
 	}
-
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
-
 	for rows.Next() {
 		if err := f(rows); err != nil {
 			return err
 		}
 	}
-
 	return rows.Err()
 }
 
 func (db *DB) QueryRow(query string, args pgx.NamedArgs, dest ...any) error {
+	var row pgx.Row
 	if db.tx != nil {
-		return db.tx.QueryRowContext(db.stopCtx, query, args).Scan(dest...)
+		row = db.tx.QueryRow(db.stopCtx, query, args)
+	} else {
+		row = db.pool.QueryRow(db.stopCtx, query, args)
 	}
-	return db.db.QueryRowContext(db.stopCtx, query, args).Scan(dest...)
+	return row.Scan(dest...)
 }
 
 func (db *DB) Ping() error {
-	return db.db.PingContext(db.stopCtx)
+	return db.pool.Ping(db.stopCtx)
+}
+
+func (db *DB) SendBatch(batch *pgx.Batch) (pgx.BatchResults, error) {
+	if db.tx != nil {
+		return db.tx.SendBatch(db.stopCtx, batch), nil
+	}
+	return db.pool.SendBatch(db.stopCtx, batch), nil
 }

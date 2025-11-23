@@ -53,19 +53,33 @@ func (r *postgresRepo) Save(url string) (string, error) {
 
 func (r *postgresRepo) SaveBatch(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error) {
 	var res []model.ShortenBatchResponse
-	if err := r.DoTx(func(rTx *postgresRepo) error {
-		for _, item := range batch {
-			shortID, err := rTx.Save(item.OriginalURL)
-			if err != nil && !errors.Is(err, errx.ErrConflict) {
-				return err
-			}
-
-			res = append(res, model.ShortenBatchResponse{CorrelationID: item.CorrelationID, ShortURL: shortID})
+	b := &pgx.Batch{}
+	for _, item := range batch {
+		shortID, err := utils.GenerateShortID()
+		if err != nil {
+			return nil, err
 		}
 
-		return nil
-	}); err != nil {
+		args := pgx.NamedArgs{
+			"short_id":     shortID,
+			"original_url": item.OriginalURL,
+		}
+
+		b.Queue(saveSQL, args)
+	}
+
+	br, err := r.db.SendBatch(b)
+	if err != nil {
 		return nil, err
+	}
+	defer br.Close()
+
+	for i := range batch {
+		item := model.ShortenBatchResponse{CorrelationID: batch[i].CorrelationID}
+		if err := br.QueryRow().Scan(&item.ShortURL); err != nil {
+			return nil, err
+		}
+		res = append(res, item)
 	}
 
 	return res, nil
@@ -99,7 +113,7 @@ func (r *postgresRepo) Ping() error {
 	return r.db.Ping()
 }
 
-func (r *postgresRepo) DoTx(f func(r *postgresRepo) error, opts ...*sql.TxOptions) error {
+func (r *postgresRepo) DoTx(f func(r *postgresRepo) error, opts ...*pgx.TxOptions) error {
 	return r.db.DoTx(func(mainDb *pg.DB) error {
 		return f(NewPostgresRepo(mainDb))
 	}, opts...)
