@@ -8,11 +8,14 @@ import (
 
 	"github.com/dmnAlex/shortener/internal/model"
 	"github.com/dmnAlex/shortener/internal/model/errx"
+	"github.com/dmnAlex/shortener/internal/utils"
 )
 
 type URLRepository interface {
-	Save(shortID, url string) error
+	Save(url string) (string, error)
+	SaveBatch(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error)
 	Find(shortID string) (string, error)
+	Ping() error
 }
 
 type fileRepo struct {
@@ -23,12 +26,16 @@ type fileRepo struct {
 	nextUUID int
 }
 
-func NewFileRepo(path string) (URLRepository, error) {
+func NewFileRepo(path string) (*fileRepo, error) {
 	r := &fileRepo{
 		path:     path,
 		urls:     make(map[string]string),
 		records:  make([]model.URLRecord, 0),
 		nextUUID: 1,
+	}
+
+	if r.path == "" {
+		return r, nil
 	}
 
 	data, err := os.ReadFile(path)
@@ -55,6 +62,10 @@ func NewFileRepo(path string) (URLRepository, error) {
 }
 
 func (r *fileRepo) saveToFile() error {
+	if r.path == "" {
+		return nil
+	}
+
 	data, err := json.Marshal(r.records)
 	if err != nil {
 		return err
@@ -63,11 +74,20 @@ func (r *fileRepo) saveToFile() error {
 	return os.WriteFile(r.path, data, 0666)
 }
 
-func (r *fileRepo) Save(shortID, url string) error {
+func (r *fileRepo) Save(url string) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	shortID, err := utils.GenerateShortID()
+	if err != nil {
+		return "", err
+	}
+
 	r.urls[shortID] = url
+
+	if r.path == "" {
+		return shortID, nil
+	}
 
 	exists := false
 	for i := range r.records {
@@ -87,7 +107,25 @@ func (r *fileRepo) Save(shortID, url string) error {
 		r.nextUUID++
 	}
 
-	return r.saveToFile()
+	if err := r.saveToFile(); err != nil {
+		return "", err
+	}
+
+	return shortID, nil
+}
+
+func (r *fileRepo) SaveBatch(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error) {
+	var res []model.ShortenBatchResponse
+	for _, item := range batch {
+		shortID, err := r.Save(item.OriginalURL)
+		if err != nil {
+			return nil, err
+		}
+
+		res = append(res, model.ShortenBatchResponse{CorrelationID: item.CorrelationID, ShortURL: shortID})
+	}
+
+	return res, nil
 }
 
 func (r *fileRepo) Find(shortID string) (string, error) {
@@ -100,4 +138,8 @@ func (r *fileRepo) Find(shortID string) (string, error) {
 	}
 
 	return url, nil
+}
+
+func (r *fileRepo) Ping() error {
+	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/dmnAlex/shortener/internal/config"
+	"github.com/dmnAlex/shortener/internal/model"
 	"github.com/dmnAlex/shortener/internal/model/errx"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -24,8 +25,10 @@ const (
 )
 
 type mockService struct {
-	shortenFunc func(url string) (string, error)
-	expandFunc  func(shortID string) (string, error)
+	shortenFunc      func(url string) (string, error)
+	shortenBatchFunc func(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error)
+	expandFunc       func(shortID string) (string, error)
+	pingFunc         func() error
 }
 
 func (m *mockService) Shorten(url string) (string, error) {
@@ -36,12 +39,24 @@ func (m *mockService) Shorten(url string) (string, error) {
 	return m.shortenFunc(url)
 }
 
+func (m *mockService) ShortenBatch(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error) {
+	if m.shortenBatchFunc == nil {
+		return nil, errx.ErrInternalError
+	}
+
+	return m.shortenBatchFunc(batch)
+}
+
 func (m *mockService) Expand(shortID string) (string, error) {
 	if m.expandFunc == nil {
 		return "", errx.ErrInternalError
 	}
 
 	return m.expandFunc(shortID)
+}
+
+func (m *mockService) Ping() error {
+	return nil
 }
 
 func TestShortenerHandler_Shorten(t *testing.T) {

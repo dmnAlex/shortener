@@ -17,6 +17,8 @@ func newRouter(h *handler.ShortenerHandler) *gin.Engine {
 	r.POST("", h.HandleShorten)
 	r.GET("/:id", h.HandleRedirect)
 	r.POST("/api/shorten", h.HandleAPIShorten)
+	r.POST("/api/shorten/batch", h.HandleAPIShortenBatch)
+	r.GET("/ping", h.HandlePing)
 
 	return r
 }

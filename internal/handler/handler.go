@@ -33,13 +33,18 @@ func (h *ShortenerHandler) HandleShorten(c *gin.Context) {
 	}
 
 	originalURL := string(body)
+	status := http.StatusCreated
 	shortURL, err := h.shortenURL(originalURL)
 	if err != nil {
-		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
-		return
+		if !errors.Is(err, errx.ErrConflict) {
+			c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+			return
+		}
+
+		status = http.StatusConflict
 	}
 
-	c.String(http.StatusCreated, shortURL)
+	c.String(status, shortURL)
 }
 
 func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
@@ -56,10 +61,15 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 		return
 	}
 
+	status := http.StatusCreated
 	shortURL, err := h.shortenURL(req.URL)
 	if err != nil {
-		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
-		return
+		if !errors.Is(err, errx.ErrConflict) {
+			c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+			return
+		}
+
+		status = http.StatusConflict
 	}
 
 	res, err := json.Marshal(model.ShortenResponse{Result: shortURL})
@@ -68,16 +78,32 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 		return
 	}
 
-	c.Data(http.StatusCreated, "application/json", res)
+	c.Data(status, "application/json", res)
 }
 
 func (h *ShortenerHandler) shortenURL(url string) (string, error) {
 	shortID, err := h.service.Shorten(url)
-	if err != nil {
-		return "", err
+	return fmt.Sprintf("%s/%s", h.config.ShortenAddress, shortID), err
+}
+
+func (h *ShortenerHandler) HandleAPIShortenBatch(c *gin.Context) {
+	var req []model.ShortenBatchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.String(http.StatusBadRequest, errx.ErrBadRequest.Error())
+		return
 	}
 
-	return fmt.Sprintf("%s/%s", h.config.ShortenAddress, shortID), nil
+	res, err := h.service.ShortenBatch(req)
+	if err != nil {
+		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+		return
+	}
+
+	for i := range res {
+		res[i].ShortURL = fmt.Sprintf("%s/%s", h.config.ShortenAddress, res[i].ShortURL)
+	}
+
+	c.JSON(http.StatusCreated, res)
 }
 
 func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
@@ -99,4 +125,13 @@ func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
 	}
 
 	c.Redirect(http.StatusTemporaryRedirect, originalURL)
+}
+
+func (h *ShortenerHandler) HandlePing(c *gin.Context) {
+	if err := h.service.Ping(); err != nil {
+		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+		return
+	}
+
+	c.String(http.StatusOK, "OK")
 }

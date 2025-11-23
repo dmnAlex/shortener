@@ -1,15 +1,15 @@
 package service
 
 import (
-	"crypto/rand"
-	"encoding/base64"
-
+	"github.com/dmnAlex/shortener/internal/model"
 	"github.com/dmnAlex/shortener/internal/repository"
 )
 
 type URLService interface {
 	Shorten(originalURL string) (string, error)
 	Expand(shortID string) (string, error)
+	ShortenBatch(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error)
+	Ping() error
 }
 
 type urlService struct {
@@ -21,24 +21,17 @@ func NewURLService(repo repository.URLRepository) URLService {
 }
 
 func (s *urlService) Shorten(originalURL string) (string, error) {
-	shortID, err := generateShortID()
-	if err != nil {
-		return "", err
-	}
-	err = s.repo.Save(shortID, originalURL)
-	return shortID, err
+	return s.repo.Save(originalURL)
+}
+
+func (s *urlService) ShortenBatch(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error) {
+	return s.repo.SaveBatch(batch)
 }
 
 func (s *urlService) Expand(shortID string) (string, error) {
 	return s.repo.Find(shortID)
 }
 
-func generateShortID() (string, error) {
-	bytes := make([]byte, 6)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		return "", err
-	}
-
-	return base64.URLEncoding.EncodeToString(bytes), nil
+func (s *urlService) Ping() error {
+	return s.repo.Ping()
 }
