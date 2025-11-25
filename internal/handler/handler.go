@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/dmnAlex/shortener/internal/config"
+	"github.com/dmnAlex/shortener/internal/logger"
 	"github.com/dmnAlex/shortener/internal/model"
 	"github.com/dmnAlex/shortener/internal/model/errx"
 	"github.com/dmnAlex/shortener/internal/service"
@@ -34,9 +35,10 @@ func (h *ShortenerHandler) HandleShorten(c *gin.Context) {
 
 	originalURL := string(body)
 	status := http.StatusCreated
-	shortURL, err := h.shortenURL(originalURL)
+	shortURL, err := h.shortenURL(c, originalURL)
 	if err != nil {
 		if !errors.Is(err, errx.ErrConflict) {
+			logger.Log.Error(err.Error())
 			c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 			return
 		}
@@ -62,9 +64,10 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 	}
 
 	status := http.StatusCreated
-	shortURL, err := h.shortenURL(req.URL)
+	shortURL, err := h.shortenURL(c, req.URL)
 	if err != nil {
 		if !errors.Is(err, errx.ErrConflict) {
+			logger.Log.Error(err.Error())
 			c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 			return
 		}
@@ -74,6 +77,7 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 
 	res, err := json.Marshal(model.ShortenResponse{Result: shortURL})
 	if err != nil {
+		logger.Log.Error(err.Error())
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 		return
 	}
@@ -81,8 +85,8 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 	c.Data(status, "application/json", res)
 }
 
-func (h *ShortenerHandler) shortenURL(url string) (string, error) {
-	shortID, err := h.service.Shorten(url)
+func (h *ShortenerHandler) shortenURL(c *gin.Context, url string) (string, error) {
+	shortID, err := h.service.Shorten(c, url)
 	return fmt.Sprintf("%s/%s", h.config.ShortenAddress, shortID), err
 }
 
@@ -93,8 +97,9 @@ func (h *ShortenerHandler) HandleAPIShortenBatch(c *gin.Context) {
 		return
 	}
 
-	res, err := h.service.ShortenBatch(req)
+	res, err := h.service.ShortenBatch(c, req)
 	if err != nil {
+		logger.Log.Error(err.Error())
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 		return
 	}
@@ -104,6 +109,26 @@ func (h *ShortenerHandler) HandleAPIShortenBatch(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, res)
+}
+
+func (h *ShortenerHandler) HandleAPIUserURLs(c *gin.Context) {
+	res, err := h.service.UserURLs(c)
+	if err != nil {
+		logger.Log.Error(err.Error())
+		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+		return
+	}
+
+	if len(res) == 0 {
+		c.Status(204)
+		return
+	}
+
+	for i := range res {
+		res[i].ShortURL = fmt.Sprintf("%s/%s", h.config.ShortenAddress, res[i].ShortURL)
+	}
+
+	c.JSON(http.StatusOK, res)
 }
 
 func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
@@ -119,7 +144,7 @@ func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
 			c.String(http.StatusNotFound, errx.ErrNotFound.Error())
 			return
 		}
-
+		logger.Log.Error(err.Error())
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 		return
 	}
@@ -129,6 +154,7 @@ func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
 
 func (h *ShortenerHandler) HandlePing(c *gin.Context) {
 	if err := h.service.Ping(); err != nil {
+		logger.Log.Error(err.Error())
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 		return
 	}

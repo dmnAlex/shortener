@@ -12,9 +12,10 @@ import (
 )
 
 type URLRepository interface {
-	Save(url string) (string, error)
-	SaveBatch(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error)
+	Save(userID, url string) (string, error)
+	SaveBatch(userID string, batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error)
 	Find(shortID string) (string, error)
+	FindAll(userID string) ([]model.UserURLsResponse, error)
 	Ping() error
 }
 
@@ -74,7 +75,7 @@ func (r *fileRepo) saveToFile() error {
 	return os.WriteFile(r.path, data, 0666)
 }
 
-func (r *fileRepo) Save(url string) (string, error) {
+func (r *fileRepo) Save(userID, url string) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -114,10 +115,10 @@ func (r *fileRepo) Save(url string) (string, error) {
 	return shortID, nil
 }
 
-func (r *fileRepo) SaveBatch(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error) {
+func (r *fileRepo) SaveBatch(userID string, batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error) {
 	var res []model.ShortenBatchResponse
 	for _, item := range batch {
-		shortID, err := r.Save(item.OriginalURL)
+		shortID, err := r.Save(userID, item.OriginalURL)
 		if err != nil {
 			return nil, err
 		}
@@ -138,6 +139,10 @@ func (r *fileRepo) Find(shortID string) (string, error) {
 	}
 
 	return url, nil
+}
+
+func (r *fileRepo) FindAll(userID string) ([]model.UserURLsResponse, error) {
+	return nil, nil
 }
 
 func (r *fileRepo) Ping() error {

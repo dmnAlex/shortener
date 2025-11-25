@@ -46,7 +46,7 @@ func main() {
 
 	service := service.NewURLService(repo)
 	handler := handler.NewShortenerHandler(service, cfg)
-	router := newRouter(handler)
+	router := newRouter(handler, cfg)
 
 	if err := router.Run(cfg.LaunchAddress.String()); err != nil {
 		log.Fatalf("router run error: %v", err)

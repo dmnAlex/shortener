@@ -3,12 +3,14 @@ package service
 import (
 	"github.com/dmnAlex/shortener/internal/model"
 	"github.com/dmnAlex/shortener/internal/repository"
+	"github.com/gin-gonic/gin"
 )
 
 type URLService interface {
-	Shorten(originalURL string) (string, error)
+	Shorten(c *gin.Context, originalURL string) (string, error)
+	ShortenBatch(c *gin.Context, batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error)
 	Expand(shortID string) (string, error)
-	ShortenBatch(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error)
+	UserURLs(c *gin.Context) ([]model.UserURLsResponse, error)
 	Ping() error
 }
 
@@ -20,12 +22,19 @@ func NewURLService(repo repository.URLRepository) URLService {
 	return &urlService{repo: repo}
 }
 
-func (s *urlService) Shorten(originalURL string) (string, error) {
-	return s.repo.Save(originalURL)
+func (s *urlService) Shorten(c *gin.Context, originalURL string) (string, error) {
+	caller := c.MustGet("caller").(*model.Caller)
+	return s.repo.Save(caller.UserID, originalURL)
 }
 
-func (s *urlService) ShortenBatch(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error) {
-	return s.repo.SaveBatch(batch)
+func (s *urlService) ShortenBatch(c *gin.Context, batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error) {
+	caller := c.MustGet("caller").(*model.Caller)
+	return s.repo.SaveBatch(caller.UserID, batch)
+}
+
+func (s *urlService) UserURLs(c *gin.Context) ([]model.UserURLsResponse, error) {
+	caller := c.MustGet("caller").(*model.Caller)
+	return s.repo.FindAll(caller.UserID)
 }
 
 func (s *urlService) Expand(shortID string) (string, error) {
