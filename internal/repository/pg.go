@@ -177,3 +177,7 @@ func (r *postgresRepo) DoTx(f func(r *postgresRepo) error, opts ...*pgx.TxOption
 		return f(NewPostgresRepo(mainDb))
 	}, opts...)
 }
+
+func (r *postgresRepo) Close() error {
+	return r.db.Close()
+}

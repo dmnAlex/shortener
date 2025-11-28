@@ -53,11 +53,13 @@ func applyMigrations(pool *pgxpool.Pool, migrationsPath string) error {
 	return nil
 }
 
-func (db *DB) Close() {
+func (db *DB) Close() error {
 	if db.tx != nil {
 		db.tx.Rollback(db.stopCtx)
 	}
 	db.pool.Close()
+
+	return nil
 }
 
 func (db *DB) WithCtx(ctx context.Context) *DB {

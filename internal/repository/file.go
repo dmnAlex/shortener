@@ -2,8 +2,8 @@ package repository
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
-	"strconv"
 	"sync"
 
 	"github.com/dmnAlex/shortener/internal/model"
@@ -17,96 +17,63 @@ type URLRepository interface {
 	Find(shortID string) (string, error)
 	FindAll(userID string) ([]model.UserURLsResponse, error)
 	Ping() error
+	Close() error
 }
 
 type fileRepo struct {
-	path     string
-	mu       sync.RWMutex
-	urls     map[string]string
-	records  []model.URLRecord
-	nextUUID int
+	mu              sync.RWMutex
+	path            string
+	ShortToOriginal map[string]string
+	OriginalToShort map[string]string
+	UserToShorts    map[string]map[string]string // userID -> shortID -> originalURL
 }
 
 func NewFileRepo(path string) (*fileRepo, error) {
 	r := &fileRepo{
-		path:     path,
-		urls:     make(map[string]string),
-		records:  make([]model.URLRecord, 0),
-		nextUUID: 1,
+		path:            path,
+		ShortToOriginal: make(map[string]string),
+		OriginalToShort: make(map[string]string),
+		UserToShorts:    make(map[string]map[string]string),
 	}
 
-	if r.path == "" {
-		return r, nil
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return r, nil
-		}
+	if err := r.loadFromFile(); err != nil {
 		return nil, err
-	}
-
-	if err := json.Unmarshal(data, &r.records); err != nil {
-		return nil, err
-	}
-
-	for _, record := range r.records {
-		r.urls[record.ShortURL] = record.OriginalURL
-		u, err := strconv.Atoi(record.UUID)
-		if err == nil && u >= r.nextUUID {
-			r.nextUUID = u + 1
-		}
 	}
 
 	return r, nil
 }
 
-func (r *fileRepo) saveToFile() error {
-	if r.path == "" {
-		return nil
-	}
-
-	data, err := json.Marshal(r.records)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(r.path, data, 0666)
-}
-
-func (r *fileRepo) Save(userID, url string) (string, error) {
+func (r *fileRepo) Save(userID, originalURL string) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	if existingShort, exists := r.OriginalToShort[originalURL]; exists {
+		if _, ok := r.UserToShorts[userID]; !ok {
+			r.UserToShorts[userID] = make(map[string]string)
+		}
+		if _, has := r.UserToShorts[userID][existingShort]; !has {
+			r.UserToShorts[userID][existingShort] = originalURL
+		}
+
+		if err := r.saveToFile(); err != nil {
+			return "", err
+		}
+
+		return existingShort, errx.ErrConflict
+	}
 
 	shortID, err := utils.GenerateShortID()
 	if err != nil {
 		return "", err
 	}
 
-	r.urls[shortID] = url
+	r.ShortToOriginal[shortID] = originalURL
+	r.OriginalToShort[originalURL] = shortID
 
-	if r.path == "" {
-		return shortID, nil
+	if _, ok := r.UserToShorts[userID]; !ok {
+		r.UserToShorts[userID] = make(map[string]string)
 	}
-
-	exists := false
-	for i := range r.records {
-		if r.records[i].ShortURL == shortID {
-			r.records[i].OriginalURL = url
-			exists = true
-			break
-		}
-	}
-
-	if !exists {
-		r.records = append(r.records, model.URLRecord{
-			UUID:        strconv.Itoa(r.nextUUID),
-			ShortURL:    shortID,
-			OriginalURL: url,
-		})
-		r.nextUUID++
-	}
+	r.UserToShorts[userID][shortID] = originalURL
 
 	if err := r.saveToFile(); err != nil {
 		return "", err
@@ -119,7 +86,7 @@ func (r *fileRepo) SaveBatch(userID string, batch []model.ShortenBatchRequest) (
 	var res []model.ShortenBatchResponse
 	for _, item := range batch {
 		shortID, err := r.Save(userID, item.OriginalURL)
-		if err != nil {
+		if err != nil && !errors.Is(err, errx.ErrConflict) {
 			return nil, err
 		}
 
@@ -133,18 +100,61 @@ func (r *fileRepo) Find(shortID string) (string, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	url, exists := r.urls[shortID]
-	if !exists {
-		return "", errx.ErrNotFound
-	}
-
-	return url, nil
+	return r.ShortToOriginal[shortID], nil
 }
 
 func (r *fileRepo) FindAll(userID string) ([]model.UserURLsResponse, error) {
-	return nil, nil
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	res := []model.UserURLsResponse{}
+	if shorts, ok := r.UserToShorts[userID]; ok {
+		for shortID, originalURL := range shorts {
+			res = append(res, model.UserURLsResponse{ShortURL: shortID, OriginalURL: originalURL})
+		}
+	}
+
+	return res, nil
 }
 
 func (r *fileRepo) Ping() error {
 	return nil
+}
+
+func (r *fileRepo) Close() error {
+	return nil
+}
+
+func (r *fileRepo) saveToFile() error {
+	if r.path == "" {
+		return nil
+	}
+
+	file, err := os.Create(r.path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	return encoder.Encode(r)
+}
+
+func (r *fileRepo) loadFromFile() error {
+	if r.path == "" {
+		return nil
+	}
+
+	file, err := os.Open(r.path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+
+		return err
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	return decoder.Decode(r)
 }
