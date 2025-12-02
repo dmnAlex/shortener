@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS urls (
     short_id TEXT PRIMARY KEY,
-    original_url TEXT NOT NULL
+    original_url TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE
 );
-
-CREATE INDEX idx_urls_short_id ON urls (short_id);

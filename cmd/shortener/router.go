@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/dmnAlex/shortener/internal/config"
 	"github.com/dmnAlex/shortener/internal/gzip"
@@ -16,8 +15,7 @@ import (
 )
 
 const (
-	authTokenName     = "auth_token"
-	authTokenDutation = 24 * time.Hour
+	authTokenName = "auth_token"
 )
 
 type Claims struct {
@@ -31,9 +29,6 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		var claims *Claims
 		if err != nil || cookie == "" {
 			claims = &Claims{
-				RegisteredClaims: jwt.RegisteredClaims{
-					ExpiresAt: jwt.NewNumericDate(time.Now().Add(authTokenDutation)),
-				},
 				UserID: uuid.NewString(),
 			}
 			token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -43,7 +38,7 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 				c.Abort()
 				return
 			}
-			c.SetCookie(authTokenName, signedToken, int(authTokenDutation.Seconds()), "/", "", false, true)
+			c.SetCookie(authTokenName, signedToken, 0, "/", "", false, true)
 		} else {
 			claims = &Claims{}
 			tkn, err := jwt.ParseWithClaims(cookie, claims, func(t *jwt.Token) (interface{}, error) {
@@ -76,6 +71,7 @@ func newRouter(h *handler.ShortenerHandler, cfg *config.Config) *gin.Engine {
 	r.POST("/api/shorten/batch", h.HandleAPIShortenBatch)
 	r.GET("/api/user/urls", h.HandleAPIUserURLs)
 	r.GET("/ping", h.HandlePing)
+	r.DELETE("/api/user/urls", h.HandleAPIDeleteURLs)
 
 	return r
 }

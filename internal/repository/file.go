@@ -18,22 +18,23 @@ type URLRepository interface {
 	FindAll(userID string) ([]model.UserURLsResponse, error)
 	Ping() error
 	Close() error
+	DeleteURLs(userID string, shortIDs []string) error
 }
 
 type fileRepo struct {
-	mu              sync.RWMutex
-	path            string
-	ShortToOriginal map[string]string
-	OriginalToShort map[string]string
-	UserToShorts    map[string]map[string]string // userID -> shortID -> originalURL
+	mu             sync.RWMutex
+	path           string
+	URLRecords     map[string]*model.URLRecord    // shortID -> shortID -> *model.URLRecord
+	IdxOriginalURL map[string]string              // originalURL -> shortID
+	IdxUserID      map[string]map[string]struct{} // userID -> shortID -> struct{}
 }
 
 func NewFileRepo(path string) (*fileRepo, error) {
 	r := &fileRepo{
-		path:            path,
-		ShortToOriginal: make(map[string]string),
-		OriginalToShort: make(map[string]string),
-		UserToShorts:    make(map[string]map[string]string),
+		path:           path,
+		URLRecords:     make(map[string]*model.URLRecord),
+		IdxOriginalURL: make(map[string]string),
+		IdxUserID:      make(map[string]map[string]struct{}),
 	}
 
 	if err := r.loadFromFile(); err != nil {
@@ -47,14 +48,7 @@ func (r *fileRepo) Save(userID, originalURL string) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if existingShort, exists := r.OriginalToShort[originalURL]; exists {
-		if _, ok := r.UserToShorts[userID]; !ok {
-			r.UserToShorts[userID] = make(map[string]string)
-		}
-		if _, has := r.UserToShorts[userID][existingShort]; !has {
-			r.UserToShorts[userID][existingShort] = originalURL
-		}
-
+	if existingShort, exists := r.IdxOriginalURL[originalURL]; exists {
 		if err := r.saveToFile(); err != nil {
 			return "", err
 		}
@@ -67,13 +61,13 @@ func (r *fileRepo) Save(userID, originalURL string) (string, error) {
 		return "", err
 	}
 
-	r.ShortToOriginal[shortID] = originalURL
-	r.OriginalToShort[originalURL] = shortID
+	r.URLRecords[shortID] = &model.URLRecord{OriginalURL: originalURL, UserID: userID}
+	r.IdxOriginalURL[originalURL] = shortID
 
-	if _, ok := r.UserToShorts[userID]; !ok {
-		r.UserToShorts[userID] = make(map[string]string)
+	if _, ok := r.IdxUserID[userID]; !ok {
+		r.IdxUserID[userID] = make(map[string]struct{})
 	}
-	r.UserToShorts[userID][shortID] = originalURL
+	r.IdxUserID[userID][shortID] = struct{}{}
 
 	if err := r.saveToFile(); err != nil {
 		return "", err
@@ -100,18 +94,25 @@ func (r *fileRepo) Find(shortID string) (string, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	return r.ShortToOriginal[shortID], nil
+	record, ok := r.URLRecords[shortID]
+	if !ok {
+		return "", errx.ErrNotFound
+	}
+
+	if record.IsDeleted {
+		return "", errx.ErrGone
+	}
+
+	return record.OriginalURL, nil
 }
 
 func (r *fileRepo) FindAll(userID string) ([]model.UserURLsResponse, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	res := []model.UserURLsResponse{}
-	if shorts, ok := r.UserToShorts[userID]; ok {
-		for shortID, originalURL := range shorts {
-			res = append(res, model.UserURLsResponse{ShortURL: shortID, OriginalURL: originalURL})
-		}
+	var res []model.UserURLsResponse
+	for shortID := range r.IdxUserID[userID] {
+		res = append(res, model.UserURLsResponse{ShortURL: shortID, OriginalURL: r.URLRecords[shortID].OriginalURL})
 	}
 
 	return res, nil
@@ -137,7 +138,7 @@ func (r *fileRepo) saveToFile() error {
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
-	return encoder.Encode(r)
+	return encoder.Encode(&r.URLRecords)
 }
 
 func (r *fileRepo) loadFromFile() error {
@@ -156,5 +157,36 @@ func (r *fileRepo) loadFromFile() error {
 	defer file.Close()
 
 	decoder := json.NewDecoder(file)
-	return decoder.Decode(r)
+	if err := decoder.Decode(&r.URLRecords); err != nil {
+		return err
+	}
+
+	for k, v := range r.URLRecords {
+		r.IdxOriginalURL[v.OriginalURL] = k
+
+		if _, ok := r.IdxUserID[v.UserID]; !ok {
+			r.IdxUserID[v.UserID] = make(map[string]struct{})
+		}
+
+		r.IdxUserID[v.UserID][k] = struct{}{}
+	}
+
+	return nil
+}
+
+func (r *fileRepo) DeleteURLs(userID string, shortIDs []string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.IdxUserID[userID]; !ok {
+		return nil
+	}
+
+	for _, shortID := range shortIDs {
+		if _, ok := r.IdxUserID[userID][shortID]; ok {
+			r.URLRecords[shortID].IsDeleted = true
+		}
+	}
+
+	return r.saveToFile()
 }

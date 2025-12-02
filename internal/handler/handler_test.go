@@ -30,6 +30,7 @@ type mockService struct {
 	expandFunc       func(shortID string) (string, error)
 	userURLsFunc     func(c *gin.Context) ([]model.UserURLsResponse, error)
 	pingFunc         func() error
+	deleteURLFunc    func(c *gin.Context, shortIDs []string) error
 }
 
 func (m *mockService) Shorten(c *gin.Context, url string) (string, error) {
@@ -62,6 +63,14 @@ func (m *mockService) UserURLs(c *gin.Context) ([]model.UserURLsResponse, error)
 	}
 
 	return m.userURLsFunc(c)
+}
+
+func (m *mockService) DeleteURLs(c *gin.Context, shortIDs []string) error {
+	if m.deleteURLFunc == nil {
+		return errx.ErrInternalError
+	}
+
+	return m.deleteURLFunc(c, shortIDs)
 }
 
 func (m *mockService) Ping() error {

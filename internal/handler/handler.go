@@ -144,6 +144,12 @@ func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
 			c.String(http.StatusNotFound, errx.ErrNotFound.Error())
 			return
 		}
+
+		if errors.Is(err, errx.ErrGone) {
+			c.Status(http.StatusGone)
+			return
+		}
+
 		logger.Log.Error(err.Error())
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 		return
@@ -160,4 +166,20 @@ func (h *ShortenerHandler) HandlePing(c *gin.Context) {
 	}
 
 	c.String(http.StatusOK, "OK")
+}
+
+func (h *ShortenerHandler) HandleAPIDeleteURLs(c *gin.Context) {
+	var shortIDs []string
+	if err := c.ShouldBindJSON(&shortIDs); err != nil {
+		c.String(http.StatusBadRequest, errx.ErrBadRequest.Error())
+		return
+	}
+
+	if err := h.service.DeleteURLs(c, shortIDs); err != nil {
+		logger.Log.Error(err.Error())
+		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+		return
+	}
+
+	c.Status(http.StatusAccepted)
 }

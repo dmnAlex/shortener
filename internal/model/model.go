@@ -1,9 +1,9 @@
 package model
 
 type URLRecord struct {
-	UUID        string `json:"uuid"`
-	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+	UserID      string `json:"user_id"`
+	IsDeleted   bool   `json:"is_deleted"`
 }
 
 type ShortenRequest struct {
@@ -35,4 +35,9 @@ func (m *UserURLsResponse) AsIfaceList() []any {
 
 type Caller struct {
 	UserID string
+}
+
+type DeleteTask struct {
+	UserID  string
+	ShortID string
 }

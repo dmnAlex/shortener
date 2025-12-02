@@ -12,6 +12,7 @@ type URLService interface {
 	Expand(shortID string) (string, error)
 	UserURLs(c *gin.Context) ([]model.UserURLsResponse, error)
 	Ping() error
+	DeleteURLs(c *gin.Context, shortIDs []string) error
 }
 
 type urlService struct {
@@ -43,4 +44,9 @@ func (s *urlService) Expand(shortID string) (string, error) {
 
 func (s *urlService) Ping() error {
 	return s.repo.Ping()
+}
+
+func (s *urlService) DeleteURLs(c *gin.Context, shortIDs []string) error {
+	caller := c.MustGet("caller").(*model.Caller)
+	return s.repo.DeleteURLs(caller.UserID, shortIDs)
 }
