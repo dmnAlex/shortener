@@ -63,7 +63,7 @@ func (r *postgresRepo) Save(userID, url string) (string, error) {
 
 	var savedShortID string
 	if err := r.db.QueryRow(saveURLSQL, args, &savedShortID); err != nil {
-		return "", nil
+		return "", err
 	}
 
 	if shortID != savedShortID {
