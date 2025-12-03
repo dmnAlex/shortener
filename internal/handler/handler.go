@@ -86,7 +86,8 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 }
 
 func (h *ShortenerHandler) shortenURL(c *gin.Context, url string) (string, error) {
-	shortID, err := h.service.Shorten(c, url)
+	caller := c.MustGet("caller").(*model.Caller)
+	shortID, err := h.service.Shorten(caller.UserID, url)
 	return fmt.Sprintf("%s/%s", h.config.ShortenAddress, shortID), err
 }
 
@@ -97,7 +98,8 @@ func (h *ShortenerHandler) HandleAPIShortenBatch(c *gin.Context) {
 		return
 	}
 
-	res, err := h.service.ShortenBatch(c, req)
+	caller := c.MustGet("caller").(*model.Caller)
+	res, err := h.service.ShortenBatch(caller.UserID, req)
 	if err != nil {
 		logger.Log.Error(err.Error())
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
@@ -112,7 +114,8 @@ func (h *ShortenerHandler) HandleAPIShortenBatch(c *gin.Context) {
 }
 
 func (h *ShortenerHandler) HandleAPIUserURLs(c *gin.Context) {
-	res, err := h.service.UserURLs(c)
+	caller := c.MustGet("caller").(*model.Caller)
+	res, err := h.service.UserURLs(caller.UserID)
 	if err != nil {
 		logger.Log.Error(err.Error())
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
@@ -175,7 +178,8 @@ func (h *ShortenerHandler) HandleAPIDeleteURLs(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.DeleteURLs(c, shortIDs); err != nil {
+	caller := c.MustGet("caller").(*model.Caller)
+	if err := h.service.DeleteURLs(caller.UserID, shortIDs); err != nil {
 		logger.Log.Error(err.Error())
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 		return
