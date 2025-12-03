@@ -22,8 +22,10 @@ type URLRepository interface {
 }
 
 type fileRepo struct {
-	mu             sync.RWMutex
-	path           string
+	mu      sync.RWMutex
+	file    *os.File
+	encoder *json.Encoder
+
 	URLRecords     map[string]*model.URLRecord    // shortID -> shortID -> *model.URLRecord
 	IdxOriginalURL map[string]string              // originalURL -> shortID
 	IdxUserID      map[string]map[string]struct{} // userID -> shortID -> struct{}
@@ -31,14 +33,22 @@ type fileRepo struct {
 
 func NewFileRepo(path string) (*fileRepo, error) {
 	r := &fileRepo{
-		path:           path,
 		URLRecords:     make(map[string]*model.URLRecord),
 		IdxOriginalURL: make(map[string]string),
 		IdxUserID:      make(map[string]map[string]struct{}),
 	}
 
-	if err := r.loadFromFile(); err != nil {
-		return nil, err
+	if path != "" {
+		if err := r.loadFromFile(path); err != nil {
+			return nil, err
+		}
+
+		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			return nil, err
+		}
+		r.file = file
+		r.encoder = json.NewEncoder(file)
 	}
 
 	return r, nil
@@ -49,10 +59,6 @@ func (r *fileRepo) Save(userID, originalURL string) (string, error) {
 	defer r.mu.Unlock()
 
 	if existingShort, exists := r.IdxOriginalURL[originalURL]; exists {
-		if err := r.saveToFile(); err != nil {
-			return "", err
-		}
-
 		return existingShort, errx.ErrConflict
 	}
 
@@ -61,17 +67,16 @@ func (r *fileRepo) Save(userID, originalURL string) (string, error) {
 		return "", err
 	}
 
-	r.URLRecords[shortID] = &model.URLRecord{OriginalURL: originalURL, UserID: userID}
-	r.IdxOriginalURL[originalURL] = shortID
+	record := &model.URLRecord{OriginalURL: originalURL, UserID: userID}
+	entry := model.FileEntry{ShortID: shortID, URLRecord: *record}
 
-	if _, ok := r.IdxUserID[userID]; !ok {
-		r.IdxUserID[userID] = make(map[string]struct{})
+	if r.encoder != nil {
+		if err := r.encoder.Encode(&entry); err != nil {
+			return "", err
+		}
 	}
-	r.IdxUserID[userID][shortID] = struct{}{}
 
-	if err := r.saveToFile(); err != nil {
-		return "", err
-	}
+	r.updateMemory(shortID, record)
 
 	return shortID, nil
 }
@@ -112,7 +117,9 @@ func (r *fileRepo) FindAll(userID string) ([]model.UserURLsResponse, error) {
 
 	var res []model.UserURLsResponse
 	for shortID := range r.IdxUserID[userID] {
-		res = append(res, model.UserURLsResponse{ShortURL: shortID, OriginalURL: r.URLRecords[shortID].OriginalURL})
+		if !r.URLRecords[shortID].IsDeleted {
+			res = append(res, model.UserURLsResponse{ShortURL: shortID, OriginalURL: r.URLRecords[shortID].OriginalURL})
+		}
 	}
 
 	return res, nil
@@ -123,30 +130,15 @@ func (r *fileRepo) Ping() error {
 }
 
 func (r *fileRepo) Close() error {
+	if r.file != nil {
+		return r.file.Close()
+	}
+
 	return nil
 }
 
-func (r *fileRepo) saveToFile() error {
-	if r.path == "" {
-		return nil
-	}
-
-	file, err := os.Create(r.path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	return encoder.Encode(&r.URLRecords)
-}
-
-func (r *fileRepo) loadFromFile() error {
-	if r.path == "" {
-		return nil
-	}
-
-	file, err := os.Open(r.path)
+func (r *fileRepo) loadFromFile(path string) error {
+	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -157,21 +149,26 @@ func (r *fileRepo) loadFromFile() error {
 	defer file.Close()
 
 	decoder := json.NewDecoder(file)
-	if err := decoder.Decode(&r.URLRecords); err != nil {
-		return err
-	}
-
-	for k, v := range r.URLRecords {
-		r.IdxOriginalURL[v.OriginalURL] = k
-
-		if _, ok := r.IdxUserID[v.UserID]; !ok {
-			r.IdxUserID[v.UserID] = make(map[string]struct{})
+	for decoder.More() {
+		var entry model.FileEntry
+		if err := decoder.Decode(&entry); err != nil {
+			return err
 		}
 
-		r.IdxUserID[v.UserID][k] = struct{}{}
+		r.updateMemory(entry.ShortID, &entry.URLRecord)
 	}
 
 	return nil
+}
+
+func (r *fileRepo) updateMemory(shortID string, record *model.URLRecord) {
+	r.URLRecords[shortID] = record
+
+	r.IdxOriginalURL[record.OriginalURL] = shortID
+	if _, ok := r.IdxUserID[record.UserID]; !ok {
+		r.IdxUserID[record.UserID] = make(map[string]struct{})
+	}
+	r.IdxUserID[record.UserID][shortID] = struct{}{}
 }
 
 func (r *fileRepo) DeleteURLs(userID string, shortIDs []string) error {
@@ -184,9 +181,17 @@ func (r *fileRepo) DeleteURLs(userID string, shortIDs []string) error {
 
 	for _, shortID := range shortIDs {
 		if _, ok := r.IdxUserID[userID][shortID]; ok {
-			r.URLRecords[shortID].IsDeleted = true
+			record := r.URLRecords[shortID]
+			record.IsDeleted = true
+
+			if r.encoder != nil {
+				entry := model.FileEntry{ShortID: shortID, URLRecord: *record}
+				if err := r.encoder.Encode(&entry); err != nil {
+					return err
+				}
+			}
 		}
 	}
 
-	return r.saveToFile()
+	return nil
 }

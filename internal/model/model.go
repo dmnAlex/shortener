@@ -6,6 +6,11 @@ type URLRecord struct {
 	IsDeleted   bool   `json:"is_deleted"`
 }
 
+type FileEntry struct {
+	ShortID string `json:"short_id"`
+	URLRecord
+}
+
 type ShortenRequest struct {
 	URL string `json:"url" binding:"required"`
 }
