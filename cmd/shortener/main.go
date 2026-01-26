@@ -32,7 +32,6 @@ func main() {
 		if err != nil {
 			log.Fatalf("db error: %v", err)
 		}
-		defer db.Close()
 
 		repo = repository.NewPostgresRepo(db)
 
@@ -43,10 +42,11 @@ func main() {
 			log.Fatalf("file repo error: %v", err)
 		}
 	}
+	defer repo.Close()
 
 	service := service.NewURLService(repo)
 	handler := handler.NewShortenerHandler(service, cfg)
-	router := newRouter(handler)
+	router := newRouter(handler, cfg)
 
 	if err := router.Run(cfg.LaunchAddress.String()); err != nil {
 		log.Fatalf("router run error: %v", err)

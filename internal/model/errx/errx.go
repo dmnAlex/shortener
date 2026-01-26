@@ -8,4 +8,5 @@ var (
 	ErrNotFound         = errors.New("not found")
 	ErrConflict         = errors.New("conflict")
 	ErrInternalError    = errors.New("internal server error")
+	ErrGone             = errors.New("gone")
 )

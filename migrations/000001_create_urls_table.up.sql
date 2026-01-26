@@ -1,8 +1,6 @@
 CREATE TABLE IF NOT EXISTS urls (
-    id SERIAL PRIMARY KEY,
-    short_id TEXT UNIQUE NOT NULL,
+    short_id TEXT PRIMARY KEY,
     original_url TEXT NOT NULL,
-    created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)::BIGINT
+    user_id TEXT NOT NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE
 );
-
-CREATE INDEX idx_urls_short_id ON urls (short_id);

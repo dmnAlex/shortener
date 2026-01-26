@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/dmnAlex/shortener/internal/config"
+	"github.com/dmnAlex/shortener/internal/logger"
 	"github.com/dmnAlex/shortener/internal/model"
 	"github.com/dmnAlex/shortener/internal/model/errx"
 	"github.com/dmnAlex/shortener/internal/service"
@@ -34,9 +35,10 @@ func (h *ShortenerHandler) HandleShorten(c *gin.Context) {
 
 	originalURL := string(body)
 	status := http.StatusCreated
-	shortURL, err := h.shortenURL(originalURL)
+	shortURL, err := h.shortenURL(c, originalURL)
 	if err != nil {
 		if !errors.Is(err, errx.ErrConflict) {
+			logger.Log.Error(err.Error())
 			c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 			return
 		}
@@ -62,9 +64,10 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 	}
 
 	status := http.StatusCreated
-	shortURL, err := h.shortenURL(req.URL)
+	shortURL, err := h.shortenURL(c, req.URL)
 	if err != nil {
 		if !errors.Is(err, errx.ErrConflict) {
+			logger.Log.Error(err.Error())
 			c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 			return
 		}
@@ -74,6 +77,7 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 
 	res, err := json.Marshal(model.ShortenResponse{Result: shortURL})
 	if err != nil {
+		logger.Log.Error(err.Error())
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 		return
 	}
@@ -81,8 +85,9 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 	c.Data(status, "application/json", res)
 }
 
-func (h *ShortenerHandler) shortenURL(url string) (string, error) {
-	shortID, err := h.service.Shorten(url)
+func (h *ShortenerHandler) shortenURL(c *gin.Context, url string) (string, error) {
+	caller := c.MustGet("caller").(*model.Caller)
+	shortID, err := h.service.Shorten(caller.UserID, url)
 	return fmt.Sprintf("%s/%s", h.config.ShortenAddress, shortID), err
 }
 
@@ -93,8 +98,10 @@ func (h *ShortenerHandler) HandleAPIShortenBatch(c *gin.Context) {
 		return
 	}
 
-	res, err := h.service.ShortenBatch(req)
+	caller := c.MustGet("caller").(*model.Caller)
+	res, err := h.service.ShortenBatch(caller.UserID, req)
 	if err != nil {
+		logger.Log.Error(err.Error())
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 		return
 	}
@@ -104,6 +111,27 @@ func (h *ShortenerHandler) HandleAPIShortenBatch(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, res)
+}
+
+func (h *ShortenerHandler) HandleAPIUserURLs(c *gin.Context) {
+	caller := c.MustGet("caller").(*model.Caller)
+	res, err := h.service.UserURLs(caller.UserID)
+	if err != nil {
+		logger.Log.Error(err.Error())
+		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+		return
+	}
+
+	if len(res) == 0 {
+		c.Status(204)
+		return
+	}
+
+	for i := range res {
+		res[i].ShortURL = fmt.Sprintf("%s/%s", h.config.ShortenAddress, res[i].ShortURL)
+	}
+
+	c.JSON(http.StatusOK, res)
 }
 
 func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
@@ -120,6 +148,12 @@ func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
 			return
 		}
 
+		if errors.Is(err, errx.ErrGone) {
+			c.Status(http.StatusGone)
+			return
+		}
+
+		logger.Log.Error(err.Error())
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 		return
 	}
@@ -129,9 +163,27 @@ func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
 
 func (h *ShortenerHandler) HandlePing(c *gin.Context) {
 	if err := h.service.Ping(); err != nil {
+		logger.Log.Error(err.Error())
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 		return
 	}
 
 	c.String(http.StatusOK, "OK")
+}
+
+func (h *ShortenerHandler) HandleAPIDeleteURLs(c *gin.Context) {
+	var shortIDs []string
+	if err := c.ShouldBindJSON(&shortIDs); err != nil {
+		c.String(http.StatusBadRequest, errx.ErrBadRequest.Error())
+		return
+	}
+
+	caller := c.MustGet("caller").(*model.Caller)
+	if err := h.service.DeleteURLs(caller.UserID, shortIDs); err != nil {
+		logger.Log.Error(err.Error())
+		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+		return
+	}
+
+	c.Status(http.StatusAccepted)
 }

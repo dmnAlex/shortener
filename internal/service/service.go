@@ -6,10 +6,12 @@ import (
 )
 
 type URLService interface {
-	Shorten(originalURL string) (string, error)
+	Shorten(userID, originalURL string) (string, error)
+	ShortenBatch(userID string, batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error)
 	Expand(shortID string) (string, error)
-	ShortenBatch(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error)
+	UserURLs(userID string) ([]model.UserURLsResponse, error)
 	Ping() error
+	DeleteURLs(userID string, shortIDs []string) error
 }
 
 type urlService struct {
@@ -20,12 +22,16 @@ func NewURLService(repo repository.URLRepository) URLService {
 	return &urlService{repo: repo}
 }
 
-func (s *urlService) Shorten(originalURL string) (string, error) {
-	return s.repo.Save(originalURL)
+func (s *urlService) Shorten(userID, originalURL string) (string, error) {
+	return s.repo.Save(userID, originalURL)
 }
 
-func (s *urlService) ShortenBatch(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error) {
-	return s.repo.SaveBatch(batch)
+func (s *urlService) ShortenBatch(userID string, batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error) {
+	return s.repo.SaveBatch(userID, batch)
+}
+
+func (s *urlService) UserURLs(userID string) ([]model.UserURLsResponse, error) {
+	return s.repo.FindAll(userID)
 }
 
 func (s *urlService) Expand(shortID string) (string, error) {
@@ -34,4 +40,8 @@ func (s *urlService) Expand(shortID string) (string, error) {
 
 func (s *urlService) Ping() error {
 	return s.repo.Ping()
+}
+
+func (s *urlService) DeleteURLs(userID string, shortIDs []string) error {
+	return s.repo.DeleteURLs(userID, shortIDs)
 }

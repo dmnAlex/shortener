@@ -1,9 +1,14 @@
 package model
 
 type URLRecord struct {
-	UUID        string `json:"uuid"`
-	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+	UserID      string `json:"user_id"`
+	IsDeleted   bool   `json:"is_deleted"`
+}
+
+type FileEntry struct {
+	ShortID string `json:"short_id"`
+	URLRecord
 }
 
 type ShortenRequest struct {
@@ -22,4 +27,22 @@ type ShortenBatchRequest struct {
 type ShortenBatchResponse struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
+}
+
+type UserURLsResponse struct {
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+}
+
+func (m *UserURLsResponse) AsIfaceList() []any {
+	return []any{&m.ShortURL, &m.OriginalURL}
+}
+
+type Caller struct {
+	UserID string
+}
+
+type DeleteTask struct {
+	UserID  string
+	ShortID string
 }

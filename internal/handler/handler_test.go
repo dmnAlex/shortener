@@ -25,26 +25,28 @@ const (
 )
 
 type mockService struct {
-	shortenFunc      func(url string) (string, error)
-	shortenBatchFunc func(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error)
+	shortenFunc      func(userID, url string) (string, error)
+	shortenBatchFunc func(userID string, batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error)
 	expandFunc       func(shortID string) (string, error)
+	userURLsFunc     func(userID string) ([]model.UserURLsResponse, error)
 	pingFunc         func() error
+	deleteURLFunc    func(userID string, shortIDs []string) error
 }
 
-func (m *mockService) Shorten(url string) (string, error) {
+func (m *mockService) Shorten(userID, url string) (string, error) {
 	if m.shortenFunc == nil {
 		return "", errx.ErrInternalError
 	}
 
-	return m.shortenFunc(url)
+	return m.shortenFunc(userID, url)
 }
 
-func (m *mockService) ShortenBatch(batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error) {
+func (m *mockService) ShortenBatch(userID string, batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error) {
 	if m.shortenBatchFunc == nil {
 		return nil, errx.ErrInternalError
 	}
 
-	return m.shortenBatchFunc(batch)
+	return m.shortenBatchFunc(userID, batch)
 }
 
 func (m *mockService) Expand(shortID string) (string, error) {
@@ -53,6 +55,22 @@ func (m *mockService) Expand(shortID string) (string, error) {
 	}
 
 	return m.expandFunc(shortID)
+}
+
+func (m *mockService) UserURLs(userID string) ([]model.UserURLsResponse, error) {
+	if m.userURLsFunc == nil {
+		return nil, errx.ErrInternalError
+	}
+
+	return m.userURLsFunc(userID)
+}
+
+func (m *mockService) DeleteURLs(userID string, shortIDs []string) error {
+	if m.deleteURLFunc == nil {
+		return errx.ErrInternalError
+	}
+
+	return m.deleteURLFunc(userID, shortIDs)
 }
 
 func (m *mockService) Ping() error {
@@ -64,7 +82,7 @@ func TestShortenerHandler_Shorten(t *testing.T) {
 		name                string
 		method              string
 		body                string
-		shortenFunc         func(string) (string, error)
+		shortenFunc         func(string, string) (string, error)
 		expectedStatus      int
 		expectedContentType string
 		expectedBody        string
@@ -72,7 +90,7 @@ func TestShortenerHandler_Shorten(t *testing.T) {
 		{
 			name: "successful shortening",
 			body: "https://example.com",
-			shortenFunc: func(url string) (string, error) {
+			shortenFunc: func(userID, url string) (string, error) {
 				return "EwHXdJfB", nil
 			},
 			expectedStatus:      http.StatusCreated,
@@ -89,7 +107,7 @@ func TestShortenerHandler_Shorten(t *testing.T) {
 		{
 			name: "service error",
 			body: "https://example.com",
-			shortenFunc: func(url string) (string, error) {
+			shortenFunc: func(userID, url string) (string, error) {
 				return "", errors.New("unexpected error")
 			},
 			expectedStatus: http.StatusInternalServerError,
@@ -110,6 +128,7 @@ func TestShortenerHandler_Shorten(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			c, _ := gin.CreateTestContext(w)
+			c.Set("caller", &model.Caller{UserID: "testUserID"})
 			c.Request = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.body))
 
 			h.HandleShorten(c)
@@ -137,7 +156,7 @@ func TestShortenerHandler_APIShorten(t *testing.T) {
 	tests := []struct {
 		name                string
 		body                string
-		shortenFunc         func(string) (string, error)
+		shortenFunc         func(string, string) (string, error)
 		expectedStatus      int
 		expectedContentType string
 		expectedBody        string
@@ -145,7 +164,7 @@ func TestShortenerHandler_APIShorten(t *testing.T) {
 		{
 			name: "successful shortening with JSON",
 			body: `{"url": "https://example.com"}`,
-			shortenFunc: func(url string) (string, error) {
+			shortenFunc: func(userID, url string) (string, error) {
 				return "EwHXdJfB", nil
 			},
 			expectedStatus:      http.StatusCreated,
@@ -162,7 +181,7 @@ func TestShortenerHandler_APIShorten(t *testing.T) {
 		{
 			name: "invalid JSON",
 			body: `{"url": "https://example.com"`,
-			shortenFunc: func(url string) (string, error) {
+			shortenFunc: func(userID, url string) (string, error) {
 				return "EwHXdJfB", nil
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -171,7 +190,7 @@ func TestShortenerHandler_APIShorten(t *testing.T) {
 		{
 			name: "missing url field",
 			body: `{"not_url": "https://example.com"}`,
-			shortenFunc: func(url string) (string, error) {
+			shortenFunc: func(userID, url string) (string, error) {
 				return "EwHXdJfB", nil
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -180,7 +199,7 @@ func TestShortenerHandler_APIShorten(t *testing.T) {
 		{
 			name: "empty url field",
 			body: `{"url": ""}`,
-			shortenFunc: func(url string) (string, error) {
+			shortenFunc: func(userID, url string) (string, error) {
 				return "EwHXdJfB", nil
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -189,7 +208,7 @@ func TestShortenerHandler_APIShorten(t *testing.T) {
 		{
 			name: "service error",
 			body: `{"url": "https://example.com"}`,
-			shortenFunc: func(url string) (string, error) {
+			shortenFunc: func(userID, url string) (string, error) {
 				return "", errors.New("unexpected error")
 			},
 			expectedStatus: http.StatusInternalServerError,
@@ -210,6 +229,7 @@ func TestShortenerHandler_APIShorten(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			c, _ := gin.CreateTestContext(w)
+			c.Set("caller", &model.Caller{UserID: "testUserID"})
 			c.Request = httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(tt.body))
 			c.Request.Header.Set("Content-Type", "application/json")
 

@@ -53,11 +53,13 @@ func applyMigrations(pool *pgxpool.Pool, migrationsPath string) error {
 	return nil
 }
 
-func (db *DB) Close() {
+func (db *DB) Close() error {
 	if db.tx != nil {
 		db.tx.Rollback(db.stopCtx)
 	}
 	db.pool.Close()
+
+	return nil
 }
 
 func (db *DB) WithCtx(ctx context.Context) *DB {
@@ -145,4 +147,34 @@ func (db *DB) SendBatch(batch *pgx.Batch) (pgx.BatchResults, error) {
 		return db.tx.SendBatch(db.stopCtx, batch), nil
 	}
 	return db.pool.SendBatch(db.stopCtx, batch), nil
+}
+
+func QueryMany[T any](db *DB, query string, pointer func(*T) []any, args ...pgx.NamedArgs) ([]T, error) {
+	var res = []T{}
+	var arg pgx.NamedArgs
+	if len(args) > 0 {
+		arg = args[0]
+	}
+
+	err := db.Query(query, arg, func(rows pgx.Rows) error {
+		var elem T
+		if err := rows.Scan(pointer(&elem)...); err != nil {
+			return err
+		}
+
+		res = append(res, elem)
+		return nil
+	})
+
+	return res, err
+}
+
+type IfaceLister interface {
+	AsIfaceList() []any
+}
+
+func IfaceListFunc[T IfaceLister]() func(T) []any {
+	return func(t T) []any {
+		return t.AsIfaceList()
+	}
 }
