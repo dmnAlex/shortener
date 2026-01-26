@@ -124,7 +124,7 @@ func TestShortenerHandler_Shorten(t *testing.T) {
 			h := NewShortenerHandler(mockService, &config.Config{
 				LaunchAddress:  config.Address{Host: host, Port: port},
 				ShortenAddress: fmt.Sprintf("http://%s:%d", host, port),
-			})
+			}, nil)
 			w := httptest.NewRecorder()
 
 			c, _ := gin.CreateTestContext(w)
@@ -225,7 +225,7 @@ func TestShortenerHandler_APIShorten(t *testing.T) {
 			h := NewShortenerHandler(mockService, &config.Config{
 				LaunchAddress:  config.Address{Host: host, Port: port},
 				ShortenAddress: fmt.Sprintf("http://%s:%d", host, port),
-			})
+			}, nil)
 			w := httptest.NewRecorder()
 
 			c, _ := gin.CreateTestContext(w)
@@ -322,7 +322,7 @@ func TestShortenerHandler_Redirect(t *testing.T) {
 			h := NewShortenerHandler(mockService, &config.Config{
 				LaunchAddress:  config.Address{Host: host, Port: port},
 				ShortenAddress: fmt.Sprintf("http://%s:%d", host, port),
-			})
+			}, nil)
 			w := httptest.NewRecorder()
 
 			c, _ := gin.CreateTestContext(w)

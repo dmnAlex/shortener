@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/dmnAlex/shortener/internal/audit"
 	"github.com/dmnAlex/shortener/internal/config"
 	"github.com/dmnAlex/shortener/internal/logger"
 	"github.com/dmnAlex/shortener/internal/model"
@@ -15,14 +17,16 @@ import (
 )
 
 type ShortenerHandler struct {
-	service service.URLService
-	config  *config.Config
+	service  service.URLService
+	config   *config.Config
+	auditMgr *audit.AuditManager
 }
 
-func NewShortenerHandler(s service.URLService, cfg *config.Config) *ShortenerHandler {
+func NewShortenerHandler(s service.URLService, cfg *config.Config, auditMgr *audit.AuditManager) *ShortenerHandler {
 	return &ShortenerHandler{
-		service: s,
-		config:  cfg,
+		service:  s,
+		config:   cfg,
+		auditMgr: auditMgr,
 	}
 }
 
@@ -44,6 +48,16 @@ func (h *ShortenerHandler) HandleShorten(c *gin.Context) {
 		}
 
 		status = http.StatusConflict
+	}
+
+	if h.auditMgr != nil {
+		caller := c.MustGet("caller").(*model.Caller)
+		h.auditMgr.Notify(model.AuditEvent{
+			Timestamp: time.Now().Unix(),
+			Action:    model.AuditActionShorten,
+			UserID:    caller.UserID,
+			URL:       originalURL,
+		})
 	}
 
 	c.String(status, shortURL)
@@ -73,6 +87,16 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 		}
 
 		status = http.StatusConflict
+	}
+
+	if h.auditMgr != nil {
+		caller := c.MustGet("caller").(*model.Caller)
+		h.auditMgr.Notify(model.AuditEvent{
+			Timestamp: time.Now().Unix(),
+			Action:    model.AuditActionShorten,
+			UserID:    caller.UserID,
+			URL:       req.URL,
+		})
 	}
 
 	res, err := json.Marshal(model.ShortenResponse{Result: shortURL})
@@ -156,6 +180,16 @@ func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
 		logger.Log.Error(err.Error())
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
 		return
+	}
+
+	if h.auditMgr != nil {
+		caller := c.MustGet("caller").(*model.Caller)
+		h.auditMgr.Notify(model.AuditEvent{
+			Timestamp: time.Now().Unix(),
+			Action:    model.AuditActionFollow,
+			UserID:    caller.UserID,
+			URL:       originalURL,
+		})
 	}
 
 	c.Redirect(http.StatusTemporaryRedirect, originalURL)

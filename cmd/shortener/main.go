@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/dmnAlex/shortener/internal/audit"
 	"github.com/dmnAlex/shortener/internal/config"
 	"github.com/dmnAlex/shortener/internal/handler"
 	"github.com/dmnAlex/shortener/internal/logger"
@@ -44,8 +45,24 @@ func main() {
 	}
 	defer repo.Close()
 
+	auditMgr := audit.NewAuditManager()
+	defer auditMgr.Close()
+
+	if cfg.AuditFile != "" {
+		fileAuditor, err := audit.NewFileAuditor(cfg.AuditFile)
+		if err != nil {
+			log.Fatalf("init file auditor: %v", err)
+		}
+
+		auditMgr.Subscribe(fileAuditor)
+	}
+
+	if cfg.AuditURL != "" {
+		auditMgr.Subscribe(audit.NewRemoteAuditor(cfg.AuditURL))
+	}
+
 	service := service.NewURLService(repo)
-	handler := handler.NewShortenerHandler(service, cfg)
+	handler := handler.NewShortenerHandler(service, cfg, auditMgr)
 	router := newRouter(handler, cfg)
 
 	if err := router.Run(cfg.LaunchAddress.String()); err != nil {

@@ -46,3 +46,17 @@ type DeleteTask struct {
 	UserID  string
 	ShortID string
 }
+
+type AuditAction string
+
+const (
+	AuditActionShorten AuditAction = "shorten"
+	AuditActionFollow  AuditAction = "follow"
+)
+
+type AuditEvent struct {
+	Timestamp int64       `json:"ts"`
+	Action    AuditAction `json:"action"`
+	UserID    string      `json:"user_id"`
+	URL       string      `json:"url"`
+}

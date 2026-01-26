@@ -51,6 +51,8 @@ type Config struct {
 	DatabaseDSN     string  `env:"DATABASE_DSN"`
 	MigrationsPath  string  `env:"MIGRATIONS_PATH"`
 	JWTSecret       string  `env:"JWT_SECRET"`
+	AuditFile       string  `env:"AUDIT_FILE"`
+	AuditURL        string  `env:"AUDIT_URL"`
 }
 
 func New() (*Config, error) {
@@ -64,6 +66,8 @@ func New() (*Config, error) {
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "database dsn")
 	flag.StringVar(&cfg.MigrationsPath, "m", "./migrations", "migrations path")
 	flag.StringVar(&cfg.JWTSecret, "j", "defaultsecret", "JWT secret")
+	flag.StringVar(&cfg.AuditFile, "audit-file", "", "path to audit log file")
+	flag.StringVar(&cfg.AuditURL, "audit-url", "", "remote audit server URL")
 
 	flag.Parse()
 
