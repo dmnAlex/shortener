@@ -11,6 +11,10 @@ import (
 	"github.com/dmnAlex/shortener/internal/repository"
 	"github.com/dmnAlex/shortener/internal/service"
 	"github.com/dmnAlex/shortener/internal/storage/pg"
+	"go.uber.org/zap"
+
+	"net/http"
+	_ "net/http/pprof"
 )
 
 func main() {
@@ -64,6 +68,12 @@ func main() {
 	service := service.NewURLService(repo)
 	handler := handler.NewShortenerHandler(service, cfg, auditMgr)
 	router := newRouter(handler, cfg)
+
+	go func() {
+		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
+			logger.Log.Error("pprof server error", zap.Error(err))
+		}
+	}()
 
 	if err := router.Run(cfg.LaunchAddress.String()); err != nil {
 		log.Fatalf("router run error: %v", err)

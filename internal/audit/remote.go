@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/dmnAlex/shortener/internal/model"
 	"github.com/pkg/errors"
 )
+
+const clientTimeout = 5 * time.Second
 
 type RemoteAuditor struct {
 	url    string
@@ -17,7 +20,7 @@ type RemoteAuditor struct {
 func NewRemoteAuditor(url string) *RemoteAuditor {
 	return &RemoteAuditor{
 		url:    url,
-		client: &http.Client{},
+		client: &http.Client{Timeout: clientTimeout},
 	}
 }
 
@@ -33,7 +36,7 @@ func (a *RemoteAuditor) Audit(event model.AuditEvent) error {
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode/2 != 2 {
+	if res.StatusCode/100 != 2 {
 		return errors.Errorf("remote audit failed with status %d", res.StatusCode)
 	}
 
