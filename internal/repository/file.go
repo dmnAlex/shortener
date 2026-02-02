@@ -1,3 +1,4 @@
+// Package repository предоставляет хранилища для URL.
 package repository
 
 import (
@@ -11,13 +12,27 @@ import (
 	"github.com/dmnAlex/shortener/internal/utils"
 )
 
+// URLRepository определяет контракт хранилища для URL.
 type URLRepository interface {
+	// Save сохраняет URL пользователя и возвращает короткий ID.
 	Save(userID, url string) (string, error)
+
+	// SaveBatch сохраняет несколько URL пакетно.
 	SaveBatch(userID string, batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error)
+
+	// Find находит оригинальный URL по короткому ID.
 	Find(shortID string) (string, error)
+
+	// FindAll возвращает все URL пользователя.
 	FindAll(userID string) ([]model.UserURLsResponse, error)
+
+	// Ping проверяет доступность хранилища.
 	Ping() error
+
+	// Close освобождает ресурсы хранилища.
 	Close() error
+
+	// DeleteURLs помечает URL как удаленные.
 	DeleteURLs(userID string, shortIDs []string) error
 }
 
