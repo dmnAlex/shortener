@@ -62,15 +62,7 @@ func (h *ShortenerHandler) HandleShorten(c *gin.Context) {
 		status = http.StatusConflict
 	}
 
-	if h.auditMgr != nil {
-		caller := c.MustGet("caller").(*model.Caller)
-		h.auditMgr.Notify(model.AuditEvent{
-			Timestamp: time.Now().Unix(),
-			Action:    model.AuditActionShorten,
-			UserID:    caller.UserID,
-			URL:       originalURL,
-		})
-	}
+	h.notifyAudit(c, model.AuditActionShorten, originalURL)
 
 	c.String(status, shortURL)
 }
@@ -105,15 +97,7 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 		status = http.StatusConflict
 	}
 
-	if h.auditMgr != nil {
-		caller := c.MustGet("caller").(*model.Caller)
-		h.auditMgr.Notify(model.AuditEvent{
-			Timestamp: time.Now().Unix(),
-			Action:    model.AuditActionShorten,
-			UserID:    caller.UserID,
-			URL:       req.URL,
-		})
-	}
+	h.notifyAudit(c, model.AuditActionShorten, req.URL)
 
 	res, err := json.Marshal(model.ShortenResponse{Result: shortURL})
 	if err != nil {
@@ -211,16 +195,7 @@ func (h *ShortenerHandler) HandleRedirect(c *gin.Context) {
 		return
 	}
 
-	if h.auditMgr != nil {
-		caller := c.MustGet("caller").(*model.Caller)
-		h.auditMgr.Notify(model.AuditEvent{
-			Timestamp: time.Now().Unix(),
-			Action:    model.AuditActionFollow,
-			UserID:    caller.UserID,
-			URL:       originalURL,
-		})
-	}
-
+	h.notifyAudit(c, model.AuditActionFollow, originalURL)
 	c.Redirect(http.StatusTemporaryRedirect, originalURL)
 }
 
@@ -254,4 +229,18 @@ func (h *ShortenerHandler) HandleAPIDeleteURLs(c *gin.Context) {
 	}
 
 	c.Status(http.StatusAccepted)
+}
+
+func (h *ShortenerHandler) notifyAudit(c *gin.Context, action model.AuditAction, url string) {
+	if h.auditMgr == nil {
+		return
+	}
+
+	caller := c.MustGet("caller").(*model.Caller)
+	h.auditMgr.Notify(model.AuditEvent{
+		Timestamp: time.Now().Unix(),
+		Action:    action,
+		UserID:    caller.UserID,
+		URL:       url,
+	})
 }

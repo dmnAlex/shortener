@@ -69,11 +69,13 @@ func main() {
 	handler := handler.NewShortenerHandler(service, cfg, auditMgr)
 	router := newRouter(handler, cfg)
 
-	go func() {
-		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
-			logger.Log.Error("pprof server error", zap.Error(err))
-		}
-	}()
+	if cfg.PprofAddress != "" {
+		go func() {
+			if err := http.ListenAndServe(cfg.PprofAddress, nil); err != nil {
+				logger.Log.Error("pprof server error", zap.Error(err))
+			}
+		}()
+	}
 
 	if err := router.Run(cfg.LaunchAddress.String()); err != nil {
 		log.Fatalf("router run error: %v", err)

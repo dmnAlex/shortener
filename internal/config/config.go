@@ -53,6 +53,7 @@ type Config struct {
 	JWTSecret       string  `env:"JWT_SECRET"`
 	AuditFile       string  `env:"AUDIT_FILE"`
 	AuditURL        string  `env:"AUDIT_URL"`
+	PprofAddress    string  `env:"PPROF_ADDRESS"`
 }
 
 func New() (*Config, error) {
@@ -68,6 +69,7 @@ func New() (*Config, error) {
 	flag.StringVar(&cfg.JWTSecret, "j", "defaultsecret", "JWT secret")
 	flag.StringVar(&cfg.AuditFile, "audit-file", "", "path to audit log file")
 	flag.StringVar(&cfg.AuditURL, "audit-url", "", "remote audit server URL")
+	flag.StringVar(&cfg.PprofAddress, "pprof", "", "pprof address")
 
 	flag.Parse()
 
