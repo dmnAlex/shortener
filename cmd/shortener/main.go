@@ -4,12 +4,17 @@ import (
 	"context"
 	"log"
 
+	"github.com/dmnAlex/shortener/internal/audit"
 	"github.com/dmnAlex/shortener/internal/config"
 	"github.com/dmnAlex/shortener/internal/handler"
 	"github.com/dmnAlex/shortener/internal/logger"
 	"github.com/dmnAlex/shortener/internal/repository"
 	"github.com/dmnAlex/shortener/internal/service"
 	"github.com/dmnAlex/shortener/internal/storage/pg"
+	"go.uber.org/zap"
+
+	"net/http"
+	_ "net/http/pprof"
 )
 
 func main() {
@@ -44,9 +49,33 @@ func main() {
 	}
 	defer repo.Close()
 
+	auditMgr := audit.NewAuditManager()
+	defer auditMgr.Close()
+
+	if cfg.AuditFile != "" {
+		fileAuditor, err := audit.NewFileAuditor(cfg.AuditFile)
+		if err != nil {
+			log.Fatalf("init file auditor: %v", err)
+		}
+
+		auditMgr.Subscribe(fileAuditor)
+	}
+
+	if cfg.AuditURL != "" {
+		auditMgr.Subscribe(audit.NewRemoteAuditor(cfg.AuditURL))
+	}
+
 	service := service.NewURLService(repo)
-	handler := handler.NewShortenerHandler(service, cfg)
+	handler := handler.NewShortenerHandler(service, cfg, auditMgr)
 	router := newRouter(handler, cfg)
+
+	if cfg.PprofAddress != "" {
+		go func() {
+			if err := http.ListenAndServe(cfg.PprofAddress, nil); err != nil {
+				logger.Log.Error("pprof server error", zap.Error(err))
+			}
+		}()
+	}
 
 	if err := router.Run(cfg.LaunchAddress.String()); err != nil {
 		log.Fatalf("router run error: %v", err)

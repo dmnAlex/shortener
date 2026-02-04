@@ -1,3 +1,4 @@
+// Package service предоставляет бизнес-логику для работы с URL.
 package service
 
 import (
@@ -5,12 +6,29 @@ import (
 	"github.com/dmnAlex/shortener/internal/repository"
 )
 
+// URLService определяет контракт сервиса для работы с URL.
 type URLService interface {
+	// Shorten создает короткую ссылку для оригинального URL пользователя.
+	// Возвращает короткий ID или ошибку ErrConflict если URL уже существует.
 	Shorten(userID, originalURL string) (string, error)
+
+	// ShortenBatch создает несколько коротких ссылок пакетно.
+	// Сохраняет соответствие correlation_id из запроса.
 	ShortenBatch(userID string, batch []model.ShortenBatchRequest) ([]model.ShortenBatchResponse, error)
+
+	// Expand возвращает оригинальный URL по короткому ID.
+	// Возвращает ErrNotFound если ссылка не найдена, ErrGone если удалена.
 	Expand(shortID string) (string, error)
+
+	// UserURLs возвращает все активные ссылки пользователя.
+	// Возвращает пустой срез если ссылок нет.
 	UserURLs(userID string) ([]model.UserURLsResponse, error)
+
+	// Ping проверяет доступность хранилища.
 	Ping() error
+
+	// DeleteURLs помечает ссылки пользователя как удаленные.
+	// Удаление выполняется асинхронно.
 	DeleteURLs(userID string, shortIDs []string) error
 }
 
@@ -18,6 +36,7 @@ type urlService struct {
 	repo repository.URLRepository
 }
 
+// NewURLService создает новый экземпляр URLService с указанным репозиторием.
 func NewURLService(repo repository.URLRepository) URLService {
 	return &urlService{repo: repo}
 }
