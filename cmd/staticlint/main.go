@@ -12,7 +12,7 @@ Package staticlint предоставляет инструмент для ста
 - shadow: поиск затененных (shadowed) переменных.
 - structtag: проверка валидности тегов в структурах.
 - Все анализаторы класса SA пакета staticcheck.io (ошибки корректности).
-- ST1000: проверка наличия документации пакета (staticcheck.io).
+- ST1005: cтиль сообщений об ошибках (staticcheck.io).
 - unused: анализ неиспользуемого кода.
 - bodyclose: проверка закрытия HTTP ответов.
 - noexit: запрет os.Exit в main() пакета main (кастомный).
@@ -48,9 +48,9 @@ func main() {
 		}
 	}
 
-	// Один анализатор другого класса (ST1000 - стиль)
+	// Один анализатор другого класса (ST1005 - стиль сообщений об ошибках)
 	for _, v := range stylecheck.Analyzers {
-		if v.Analyzer.Name == "ST1000" {
+		if v.Analyzer.Name == "ST1005" {
 			analyzers = append(analyzers, v.Analyzer)
 		}
 	}

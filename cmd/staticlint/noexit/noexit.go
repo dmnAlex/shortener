@@ -2,6 +2,7 @@ package noexit
 
 import (
 	"go/ast"
+	"strings"
 
 	"golang.org/x/tools/go/analysis"
 )
@@ -18,6 +19,10 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 
 	for _, file := range pass.Files {
+		if isGenerated(file) {
+			continue
+		}
+
 		ast.Inspect(file, func(n ast.Node) bool {
 			fn, ok := n.(*ast.FuncDecl)
 			if !ok || fn.Name.Name != "main" {
@@ -52,4 +57,16 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 
 	return nil, nil
+}
+
+func isGenerated(file *ast.File) bool {
+	for _, commentGroup := range file.Comments {
+		for _, comment := range commentGroup.List {
+			if strings.Contains(comment.Text, "Code generated") ||
+				strings.Contains(comment.Text, "DO NOT EDIT") {
+				return true
+			}
+		}
+	}
+	return false
 }

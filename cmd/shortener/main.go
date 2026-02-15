@@ -33,7 +33,8 @@ func main() {
 	var repo repository.URLRepository
 	if cfg.DatabaseDSN != "" {
 		logger.Log.Info("using pg database")
-		db, err := pg.New(globalCtx, cfg.DatabaseDSN, cfg.MigrationsPath)
+		var db *pg.DB
+		db, err = pg.New(globalCtx, cfg.DatabaseDSN, cfg.MigrationsPath)
 		if err != nil {
 			log.Fatalf("db error: %v", err)
 		}
