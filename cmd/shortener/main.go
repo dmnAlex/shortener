@@ -17,7 +17,15 @@ import (
 	_ "net/http/pprof"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	logInfo()
+
 	globalCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -81,4 +89,20 @@ func main() {
 	if err := router.Run(cfg.LaunchAddress.String()); err != nil {
 		log.Fatalf("router run error: %v", err)
 	}
+}
+
+func logInfo() {
+	if buildVersion == "" {
+		buildVersion = "N/A"
+	}
+	if buildDate == "" {
+		buildDate = "N/A"
+	}
+	if buildCommit == "" {
+		buildCommit = "N/A"
+	}
+
+	log.Println("Build version: ", buildVersion)
+	log.Println("Build date: ", buildDate)
+	log.Println("Build commit: ", buildCommit)
 }
