@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/dmnAlex/shortener/internal/audit"
 	"github.com/dmnAlex/shortener/internal/config"
@@ -57,7 +61,11 @@ func main() {
 			log.Fatalf("file repo error: %v", err)
 		}
 	}
-	defer repo.Close()
+	defer func() {
+		if err := repo.Close(); err != nil {
+			logger.Log.Error("repo close error", zap.Error(err))
+		}
+	}()
 
 	auditMgr := audit.NewAuditManager()
 	defer auditMgr.Close()
@@ -79,16 +87,46 @@ func main() {
 	handler := handler.NewShortenerHandler(service, cfg, auditMgr)
 	router := newRouter(handler, cfg)
 
+	srv := &http.Server{
+		Addr:    cfg.LaunchAddress.String(),
+		Handler: router,
+	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+
+	var pprofSrv *http.Server
 	if cfg.PprofAddress != "" {
+		pprofSrv = &http.Server{
+			Addr:    cfg.PprofAddress,
+			Handler: nil,
+		}
 		go func() {
-			if err := http.ListenAndServe(cfg.PprofAddress, nil); err != nil {
+			if err := pprofSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				logger.Log.Error("pprof server error", zap.Error(err))
 			}
 		}()
 	}
 
-	if err := router.Run(cfg.LaunchAddress.String()); err != nil {
-		log.Fatalf("router run error: %v", err)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	logger.Log.Info("Shutdown server...")
+
+	ctx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelShutdown()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.Log.Fatal("Server shutdown:", zap.Error(err))
+	}
+
+	if pprofSrv != nil {
+		if err := pprofSrv.Shutdown(ctx); err != nil {
+			logger.Log.Error("Pprof shutdown:", zap.Error(err))
+		}
 	}
 }
 
