@@ -80,7 +80,7 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 
 	var req model.ShortenRequest
 
-	if err := json.Unmarshal(body, &req); err != nil || req.URL == "" {
+	if err = json.Unmarshal(body, &req); err != nil || req.URL == "" {
 		c.String(http.StatusBadRequest, errx.ErrBadRequest.Error())
 		return
 	}

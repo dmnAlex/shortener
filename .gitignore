@@ -12,6 +12,7 @@
 *.out
 
 # Binaries
+/staticlint
 shortener
 shortenertest_v2
 cmd/shortener/main

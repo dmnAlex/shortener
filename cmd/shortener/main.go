@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/dmnAlex/shortener/internal/audit"
 	"github.com/dmnAlex/shortener/internal/config"
@@ -17,7 +21,16 @@ import (
 	_ "net/http/pprof"
 )
 
+// go build -ldflags "-X main.buildVersion=v1.0.1 -X 'main.buildDate=$(date +'%Y/%m/%d %H:%M:%S')' -X 'main.buildCommit=$(git rev-parse HEAD)'" ./cmd/shortener
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	logInfo()
+
 	globalCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -33,7 +46,8 @@ func main() {
 	var repo repository.URLRepository
 	if cfg.DatabaseDSN != "" {
 		logger.Log.Info("using pg database")
-		db, err := pg.New(globalCtx, cfg.DatabaseDSN, cfg.MigrationsPath)
+		var db *pg.DB
+		db, err = pg.New(globalCtx, cfg.DatabaseDSN, cfg.MigrationsPath)
 		if err != nil {
 			log.Fatalf("db error: %v", err)
 		}
@@ -47,7 +61,11 @@ func main() {
 			log.Fatalf("file repo error: %v", err)
 		}
 	}
-	defer repo.Close()
+	defer func() {
+		if err := repo.Close(); err != nil {
+			logger.Log.Error("repo close error", zap.Error(err))
+		}
+	}()
 
 	auditMgr := audit.NewAuditManager()
 	defer auditMgr.Close()
@@ -69,15 +87,61 @@ func main() {
 	handler := handler.NewShortenerHandler(service, cfg, auditMgr)
 	router := newRouter(handler, cfg)
 
+	srv := &http.Server{
+		Addr:    cfg.LaunchAddress.String(),
+		Handler: router,
+	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+
+	var pprofSrv *http.Server
 	if cfg.PprofAddress != "" {
+		pprofSrv = &http.Server{
+			Addr:    cfg.PprofAddress,
+			Handler: nil,
+		}
 		go func() {
-			if err := http.ListenAndServe(cfg.PprofAddress, nil); err != nil {
+			if err := pprofSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				logger.Log.Error("pprof server error", zap.Error(err))
 			}
 		}()
 	}
 
-	if err := router.Run(cfg.LaunchAddress.String()); err != nil {
-		log.Fatalf("router run error: %v", err)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	logger.Log.Info("Shutdown server...")
+
+	ctx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelShutdown()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.Log.Fatal("Server shutdown:", zap.Error(err))
 	}
+
+	if pprofSrv != nil {
+		if err := pprofSrv.Shutdown(ctx); err != nil {
+			logger.Log.Error("Pprof shutdown:", zap.Error(err))
+		}
+	}
+}
+
+func logInfo() {
+	if buildVersion == "" {
+		buildVersion = "N/A"
+	}
+	if buildDate == "" {
+		buildDate = "N/A"
+	}
+	if buildCommit == "" {
+		buildCommit = "N/A"
+	}
+
+	log.Println("Build version: ", buildVersion)
+	log.Println("Build date: ", buildDate)
+	log.Println("Build commit: ", buildCommit)
 }
