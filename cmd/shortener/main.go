@@ -15,6 +15,7 @@ import (
 	"github.com/dmnAlex/shortener/internal/repository"
 	"github.com/dmnAlex/shortener/internal/service"
 	"github.com/dmnAlex/shortener/internal/storage/pg"
+	"github.com/dmnAlex/shortener/internal/tls"
 	"go.uber.org/zap"
 
 	"net/http"
@@ -93,8 +94,20 @@ func main() {
 	}
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %s\n", err)
+		var err error
+		if cfg.EnableHTTPS {
+			certFile, keyFile, genErr := tls.GenerateSelfSignedCert()
+			if genErr != nil {
+				log.Fatalf("generate cert: %v", genErr)
+			}
+			defer os.Remove(certFile)
+			defer os.Remove(keyFile)
+			err = srv.ListenAndServeTLS(certFile, keyFile)
+		} else {
+			err = srv.ListenAndServe()
+		}
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen:  %v", err)
 		}
 	}()
 
