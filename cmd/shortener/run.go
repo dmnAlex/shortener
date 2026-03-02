@@ -15,7 +15,7 @@ import (
 	"github.com/dmnAlex/shortener/internal/repository"
 	"github.com/dmnAlex/shortener/internal/service"
 	"github.com/dmnAlex/shortener/internal/storage/pg"
-	"github.com/dmnAlex/shortener/internal/tls"
+	"github.com/dmnAlex/shortener/internal/tlsutil"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
@@ -85,7 +85,7 @@ func run() error {
 	var certFile, keyFile string
 	if cfg.EnableHTTPS {
 		var genErr error
-		certFile, keyFile, genErr = tls.GenerateSelfSignedCert()
+		certFile, keyFile, genErr = tlsutil.GenerateSelfSignedCert()
 		if genErr != nil {
 			return errors.Wrap(err, "generate cert")
 		}
