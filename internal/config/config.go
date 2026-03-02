@@ -13,11 +13,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	defaultHost = "localhost"
-	defaultPort = 8080
-)
-
 type Address struct {
 	Host string
 	Port int
@@ -61,19 +56,17 @@ type Config struct {
 }
 
 func New() (*Config, error) {
-	cfg := &Config{
-		LaunchAddress: Address{Host: defaultHost, Port: defaultPort},
-	}
+	cfg := &Config{}
 	var configPath string
 	flag.StringVar(&configPath, "c", "", "path to config file")
 	flag.StringVar(&configPath, "config", "", "path to config file")
 	flag.Var(&cfg.LaunchAddress, "a", "launch address")
-	flag.StringVar(&cfg.ShortenAddress, "b", fmt.Sprintf("http://%s:%d", defaultHost, defaultPort), "shorten address")
+	flag.StringVar(&cfg.ShortenAddress, "b", "", "shorten address")
 	flag.StringVar(&cfg.LogLevel, "l", "info", "log level")
-	flag.StringVar(&cfg.FileStoragePath, "f", "./storage.json", "file storage path")
+	flag.StringVar(&cfg.FileStoragePath, "f", "", "file storage path")
 	flag.StringVar(&cfg.DatabaseDSN, "d", "", "database dsn")
-	flag.StringVar(&cfg.MigrationsPath, "m", "./migrations", "migrations path")
-	flag.StringVar(&cfg.JWTSecret, "j", "defaultsecret", "JWT secret")
+	flag.StringVar(&cfg.MigrationsPath, "m", "", "migrations path")
+	flag.StringVar(&cfg.JWTSecret, "j", "", "JWT secret")
 	flag.StringVar(&cfg.AuditFile, "audit-file", "", "path to audit log file")
 	flag.StringVar(&cfg.AuditURL, "audit-url", "", "remote audit server URL")
 	flag.StringVar(&cfg.PprofAddress, "pprof", "", "pprof address")
@@ -99,11 +92,34 @@ func New() (*Config, error) {
 		return nil, err
 	}
 
-	if cfg.EnableHTTPS {
-		cfg.ShortenAddress = strings.Replace(cfg.ShortenAddress, "http://", "https://", 1)
-	}
+	setDefaults(cfg)
 
 	return cfg, nil
+}
+
+func setDefaults(cfg *Config) {
+	if cfg.LaunchAddress.Host == "" {
+		cfg.LaunchAddress = Address{Host: "localhost", Port: 8080}
+	}
+	if cfg.ShortenAddress == "" {
+		prefix := "http"
+		if cfg.EnableHTTPS {
+			prefix = "https"
+		}
+		cfg.ShortenAddress = fmt.Sprintf("%s://%s", prefix, cfg.LaunchAddress.String())
+	}
+	if cfg.LogLevel == "" {
+		cfg.LogLevel = "info"
+	}
+	if cfg.FileStoragePath == "" {
+		cfg.FileStoragePath = "./storage.json"
+	}
+	if cfg.MigrationsPath == "" {
+		cfg.MigrationsPath = "./migrations"
+	}
+	if cfg.JWTSecret == "" {
+		cfg.JWTSecret = "defaultsecret"
+	}
 }
 
 func loadJSON(path string) (*Config, error) {

@@ -13,9 +13,8 @@
 
 # Binaries
 /staticlint
-shortener
+/shortener
 shortenertest_v2
-cmd/shortener/main
 cmd/shortener/shortener
 cmd/shortener/shortenertest_v2
 
