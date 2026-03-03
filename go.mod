@@ -3,6 +3,7 @@ module github.com/dmnAlex/shortener
 go 1.24.13
 
 require (
+	dario.cat/mergo v1.0.2
 	github.com/caarlos0/env v3.5.0+incompatible
 	github.com/gin-gonic/gin v1.11.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
