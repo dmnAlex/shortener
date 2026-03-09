@@ -1,5 +1,7 @@
 package model
 
+import "github.com/golang-jwt/jwt/v4"
+
 type URLRecord struct {
 	OriginalURL string `json:"original_url"`
 	UserID      string `json:"user_id"`
@@ -59,4 +61,14 @@ type AuditEvent struct {
 	Action    AuditAction `json:"action"`
 	UserID    string      `json:"user_id"`
 	URL       string      `json:"url"`
+}
+
+type Claims struct {
+	jwt.RegisteredClaims
+	UserID string `json:"user_id"`
+}
+
+type StatsResponse struct {
+	URLs  int `json:"urls"`
+	Users int `json:"users"`
 }

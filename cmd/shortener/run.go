@@ -13,6 +13,7 @@ import (
 	"github.com/dmnAlex/shortener/internal/handler"
 	"github.com/dmnAlex/shortener/internal/logger"
 	"github.com/dmnAlex/shortener/internal/repository"
+	"github.com/dmnAlex/shortener/internal/router"
 	"github.com/dmnAlex/shortener/internal/service"
 	"github.com/dmnAlex/shortener/internal/storage/pg"
 	"github.com/dmnAlex/shortener/internal/tlsutil"
@@ -75,7 +76,7 @@ func run() error {
 
 	service := service.NewURLService(repo)
 	handler := handler.NewShortenerHandler(service, cfg, auditMgr)
-	router := newRouter(handler, cfg)
+	router := router.New(handler, cfg)
 
 	srv := &http.Server{
 		Addr:    cfg.LaunchAddress.String(),

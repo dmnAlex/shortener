@@ -53,6 +53,7 @@ type Config struct {
 	AuditURL        string  `env:"AUDIT_URL" json:"audit_url"`
 	PprofAddress    string  `env:"PPROF_ADDRESS" json:"pprof_address"`
 	EnableHTTPS     bool    `env:"ENABLE_HTTPS" json:"enable_https"`
+	TrustedSubnet   string  `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
 }
 
 func New() (*Config, error) {
@@ -71,6 +72,7 @@ func New() (*Config, error) {
 	flag.StringVar(&cfg.AuditURL, "audit-url", "", "remote audit server URL")
 	flag.StringVar(&cfg.PprofAddress, "pprof", "", "pprof address")
 	flag.BoolVar(&cfg.EnableHTTPS, "s", false, "enable https")
+	flag.StringVar(&cfg.TrustedSubnet, "t", "", "trusted subnet CIDR")
 	flag.Parse()
 
 	if envPath := os.Getenv("CONFIG"); envPath != "" {

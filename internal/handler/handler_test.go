@@ -31,6 +31,7 @@ type mockService struct {
 	userURLsFunc     func(userID string) ([]model.UserURLsResponse, error)
 	pingFunc         func() error
 	deleteURLFunc    func(userID string, shortIDs []string) error
+	statsFunc        func() (int, int, error)
 }
 
 func (m *mockService) Shorten(userID, url string) (string, error) {
@@ -75,6 +76,14 @@ func (m *mockService) DeleteURLs(userID string, shortIDs []string) error {
 
 func (m *mockService) Ping() error {
 	return nil
+}
+
+func (m *mockService) Stats() (int, int, error) {
+	if m.statsFunc == nil {
+		return 0, 0, errx.ErrInternalError
+	}
+
+	return m.statsFunc()
 }
 
 func TestShortenerHandler_Shorten(t *testing.T) {

@@ -34,6 +34,9 @@ type URLRepository interface {
 
 	// DeleteURLs помечает URL как удаленные.
 	DeleteURLs(userID string, shortIDs []string) error
+
+	// Stats возвращает количество URL и пользователей
+	Stats() (urls int, users int, err error)
 }
 
 type fileRepo struct {
@@ -209,4 +212,11 @@ func (r *fileRepo) DeleteURLs(userID string, shortIDs []string) error {
 	}
 
 	return nil
+}
+
+func (r *fileRepo) Stats() (int, int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	return len(r.URLRecords), len(r.IdxUserID), nil
 }

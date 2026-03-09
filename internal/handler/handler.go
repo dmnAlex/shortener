@@ -244,3 +244,17 @@ func (h *ShortenerHandler) notifyAudit(c *gin.Context, action model.AuditAction,
 		URL:       url,
 	})
 }
+
+func (h *ShortenerHandler) HandleInternalStats(c *gin.Context) {
+	urls, users, err := h.service.Stats()
+	if err != nil {
+		logger.Log.Error(err.Error())
+		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, model.StatsResponse{
+		URLs:  urls,
+		Users: users,
+	})
+}
