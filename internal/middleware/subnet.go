@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// SubnetCheck проверяет что значение заголовка X-Real-IP соответствует доверенной подсети.
 func SubnetCheck(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cfg.TrustedSubnet == "" {
