@@ -33,7 +33,7 @@ func ExampleShortenerHandler_HandleShorten() {
 	// Создаем тестовый контекст Gin
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Set("caller", &model.Caller{UserID: "test-user"})
+	c.Set(model.CallerKey, &model.Caller{UserID: "test-user"})
 	c.Request = httptest.NewRequest("POST", "/", strings.NewReader("https://example.com"))
 
 	// Вызываем хендлер
@@ -56,7 +56,7 @@ func ExampleShortenerHandler_HandleAPIShorten() {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Set("caller", &model.Caller{UserID: "test-user"})
+	c.Set(model.CallerKey, &model.Caller{UserID: "test-user"})
 
 	// JSON запрос
 	jsonBody := `{"url": "https://example.org"}`
@@ -90,7 +90,7 @@ func ExampleShortenerHandler_HandleRedirect() {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Set("caller", &model.Caller{UserID: "test-user"})
+	c.Set(model.CallerKey, &model.Caller{UserID: "test-user"})
 	c.Request = httptest.NewRequest("GET", "/"+shortID, nil)
 	c.Params = []gin.Param{{Key: "id", Value: shortID}}
 
@@ -115,7 +115,7 @@ func ExampleShortenerHandler_HandleAPIShortenBatch() {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Set("caller", &model.Caller{UserID: "test-user"})
+	c.Set(model.CallerKey, &model.Caller{UserID: "test-user"})
 
 	// Пакетный запрос
 	batchBody := `[
@@ -148,7 +148,7 @@ func ExampleShortenerHandler_HandleAPIUserURLs() {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Set("caller", &model.Caller{UserID: "test-user"})
+	c.Set(model.CallerKey, &model.Caller{UserID: "test-user"})
 	c.Request = httptest.NewRequest("GET", "/api/user/urls", nil)
 
 	h.HandleAPIUserURLs(c)
@@ -178,7 +178,7 @@ func ExampleShortenerHandler_HandleAPIDeleteURLs() {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Set("caller", &model.Caller{UserID: "test-user"})
+	c.Set(model.CallerKey, &model.Caller{UserID: "test-user"})
 
 	// Запрос на удаление
 	deleteBody := fmt.Sprintf(`["%s"]`, shortID)

@@ -52,7 +52,7 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 				return
 			}
 		}
-		c.Set("caller", &model.Caller{UserID: claims.UserID})
+		c.Set(model.CallerKey, &model.Caller{UserID: claims.UserID})
 		c.Next()
 	}
 }
@@ -82,7 +82,7 @@ func GRPCAuth(cfg *config.Config) grpc.UnaryServerInterceptor {
 			return nil, status.Error(codes.Unauthenticated, errx.ErrUnauthorized.Error())
 		}
 
-		ctx = context.WithValue(ctx, "caller", &model.Caller{UserID: claims.UserID})
+		ctx = context.WithValue(ctx, model.CallerKey, &model.Caller{UserID: claims.UserID})
 		return handler(ctx, req)
 	}
 }

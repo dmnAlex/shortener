@@ -118,7 +118,7 @@ func (s *shortenerServer) ListUserURLs(ctx context.Context, _ *emptypb.Empty) (*
 }
 
 func getCaller(ctx context.Context) *model.Caller {
-	if caller, ok := ctx.Value("caller").(*model.Caller); ok {
+	if caller, ok := ctx.Value(model.CallerKey).(*model.Caller); ok {
 		return caller
 	}
 

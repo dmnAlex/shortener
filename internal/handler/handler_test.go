@@ -137,7 +137,7 @@ func TestShortenerHandler_Shorten(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			c, _ := gin.CreateTestContext(w)
-			c.Set("caller", &model.Caller{UserID: "testUserID"})
+			c.Set(model.CallerKey, &model.Caller{UserID: "testUserID"})
 			c.Request = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.body))
 
 			h.HandleShorten(c)
@@ -238,7 +238,7 @@ func TestShortenerHandler_APIShorten(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			c, _ := gin.CreateTestContext(w)
-			c.Set("caller", &model.Caller{UserID: "testUserID"})
+			c.Set(model.CallerKey, &model.Caller{UserID: "testUserID"})
 			c.Request = httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(tt.body))
 			c.Request.Header.Set("Content-Type", "application/json")
 

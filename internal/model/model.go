@@ -72,3 +72,9 @@ type StatsResponse struct {
 	URLs  int `json:"urls"`
 	Users int `json:"users"`
 }
+
+type ctxKey string
+
+const (
+	CallerKey ctxKey = "caller"
+)
