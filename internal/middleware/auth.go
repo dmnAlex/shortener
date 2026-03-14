@@ -1,14 +1,21 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/dmnAlex/shortener/internal/config"
 	"github.com/dmnAlex/shortener/internal/model"
+	"github.com/dmnAlex/shortener/internal/model/errx"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -47,5 +54,35 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 		}
 		c.Set("caller", &model.Caller{UserID: claims.UserID})
 		c.Next()
+	}
+}
+
+func GRPCAuth(cfg *config.Config) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return nil, status.Error(codes.Unauthenticated, errx.ErrUnauthorized.Error())
+		}
+
+		values := md.Get("authorization")
+		if len(values) == 0 {
+			return nil, status.Error(codes.Unauthenticated, errx.ErrUnauthorized.Error())
+		}
+
+		tokenStr := strings.TrimPrefix(values[0], "Bearer ")
+
+		claims := &model.Claims{}
+		tkn, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			}
+			return []byte(cfg.JWTSecret), nil
+		})
+		if err != nil || !tkn.Valid || claims.UserID == "" {
+			return nil, status.Error(codes.Unauthenticated, errx.ErrUnauthorized.Error())
+		}
+
+		ctx = context.WithValue(ctx, "caller", &model.Caller{UserID: claims.UserID})
+		return handler(ctx, req)
 	}
 }

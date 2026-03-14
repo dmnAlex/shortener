@@ -54,6 +54,7 @@ type Config struct {
 	PprofAddress    string  `env:"PPROF_ADDRESS" json:"pprof_address"`
 	EnableHTTPS     bool    `env:"ENABLE_HTTPS" json:"enable_https"`
 	TrustedSubnet   string  `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
+	GRPCAddress     string  `env:"GRPC_ADDRESS" json:"grpc_address"`
 }
 
 func New() (*Config, error) {
@@ -73,6 +74,7 @@ func New() (*Config, error) {
 	flag.StringVar(&cfg.PprofAddress, "pprof", "", "pprof address")
 	flag.BoolVar(&cfg.EnableHTTPS, "s", false, "enable https")
 	flag.StringVar(&cfg.TrustedSubnet, "t", "", "trusted subnet CIDR")
+	flag.StringVar(&cfg.GRPCAddress, "g", "", "grpc server address")
 	flag.Parse()
 
 	if envPath := os.Getenv("CONFIG"); envPath != "" {
