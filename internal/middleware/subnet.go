@@ -10,18 +10,20 @@ import (
 
 // SubnetCheck проверяет что значение заголовка X-Real-IP соответствует доверенной подсети.
 func SubnetCheck(cfg *config.Config) gin.HandlerFunc {
+	if cfg.TrustedSubnet == "" {
+		return func(c *gin.Context) {
+			c.AbortWithStatus(http.StatusForbidden)
+		}
+	}
+
+	_, network, err := net.ParseCIDR(cfg.TrustedSubnet)
+	if err != nil {
+		return func(c *gin.Context) {
+			c.AbortWithStatus(http.StatusForbidden)
+		}
+	}
+
 	return func(c *gin.Context) {
-		if cfg.TrustedSubnet == "" {
-			c.AbortWithStatus(http.StatusForbidden)
-			return
-		}
-
-		_, network, err := net.ParseCIDR(cfg.TrustedSubnet)
-		if err != nil {
-			c.AbortWithStatus(http.StatusForbidden)
-			return
-		}
-
 		clientIP := net.ParseIP(c.GetHeader("X-Real-IP"))
 		if clientIP == nil || !network.Contains(clientIP) {
 			c.AbortWithStatus(http.StatusForbidden)
