@@ -110,7 +110,7 @@ func (h *ShortenerHandler) HandleAPIShorten(c *gin.Context) {
 }
 
 func (h *ShortenerHandler) shortenURL(c *gin.Context, url string) (string, error) {
-	caller := c.MustGet("caller").(*model.Caller)
+	caller := c.MustGet(model.CallerKey).(*model.Caller)
 	shortID, err := h.service.Shorten(caller.UserID, url)
 	return fmt.Sprintf("%s/%s", h.config.ShortenAddress, shortID), err
 }
@@ -125,7 +125,7 @@ func (h *ShortenerHandler) HandleAPIShortenBatch(c *gin.Context) {
 		return
 	}
 
-	caller := c.MustGet("caller").(*model.Caller)
+	caller := c.MustGet(model.CallerKey).(*model.Caller)
 	res, err := h.service.ShortenBatch(caller.UserID, req)
 	if err != nil {
 		logger.Log.Error(err.Error())
@@ -144,7 +144,7 @@ func (h *ShortenerHandler) HandleAPIShortenBatch(c *gin.Context) {
 // Возвращает массив объектов с short_url и original_url.
 // Статус 204 No Content - если у пользователя нет ссылок.
 func (h *ShortenerHandler) HandleAPIUserURLs(c *gin.Context) {
-	caller := c.MustGet("caller").(*model.Caller)
+	caller := c.MustGet(model.CallerKey).(*model.Caller)
 	res, err := h.service.UserURLs(caller.UserID)
 	if err != nil {
 		logger.Log.Error(err.Error())
@@ -221,7 +221,7 @@ func (h *ShortenerHandler) HandleAPIDeleteURLs(c *gin.Context) {
 		return
 	}
 
-	caller := c.MustGet("caller").(*model.Caller)
+	caller := c.MustGet(model.CallerKey).(*model.Caller)
 	if err := h.service.DeleteURLs(caller.UserID, shortIDs); err != nil {
 		logger.Log.Error(err.Error())
 		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
@@ -236,11 +236,25 @@ func (h *ShortenerHandler) notifyAudit(c *gin.Context, action model.AuditAction,
 		return
 	}
 
-	caller := c.MustGet("caller").(*model.Caller)
+	caller := c.MustGet(model.CallerKey).(*model.Caller)
 	h.auditMgr.Notify(model.AuditEvent{
 		Timestamp: time.Now().Unix(),
 		Action:    action,
 		UserID:    caller.UserID,
 		URL:       url,
+	})
+}
+
+func (h *ShortenerHandler) HandleInternalStats(c *gin.Context) {
+	urls, users, err := h.service.Stats()
+	if err != nil {
+		logger.Log.Error(err.Error())
+		c.String(http.StatusInternalServerError, errx.ErrInternalError.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, model.StatsResponse{
+		URLs:  urls,
+		Users: users,
 	})
 }

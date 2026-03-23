@@ -2,7 +2,6 @@ package repository
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/dmnAlex/shortener/internal/utils"
 	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -231,4 +231,18 @@ func (r *postgresRepo) DeleteURLs(userID string, shortIDs []string) error {
 	}
 
 	return nil
+}
+
+const statsSQL = `
+	SELECT
+		COUNT(*) AS urls,
+		COUNT(DISTINCT user_id) AS users
+	FROM urls
+	WHERE is_deleted = FALSE
+`
+
+func (r *postgresRepo) Stats() (int, int, error) {
+	var urls, users int
+	err := r.db.QueryRow(statsSQL, pgx.NamedArgs{}, &urls, &users)
+	return urls, users, errors.Wrap(err, "query row")
 }

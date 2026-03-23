@@ -31,6 +31,7 @@ type mockService struct {
 	userURLsFunc     func(userID string) ([]model.UserURLsResponse, error)
 	pingFunc         func() error
 	deleteURLFunc    func(userID string, shortIDs []string) error
+	statsFunc        func() (int, int, error)
 }
 
 func (m *mockService) Shorten(userID, url string) (string, error) {
@@ -75,6 +76,14 @@ func (m *mockService) DeleteURLs(userID string, shortIDs []string) error {
 
 func (m *mockService) Ping() error {
 	return nil
+}
+
+func (m *mockService) Stats() (int, int, error) {
+	if m.statsFunc == nil {
+		return 0, 0, errx.ErrInternalError
+	}
+
+	return m.statsFunc()
 }
 
 func TestShortenerHandler_Shorten(t *testing.T) {
@@ -128,7 +137,7 @@ func TestShortenerHandler_Shorten(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			c, _ := gin.CreateTestContext(w)
-			c.Set("caller", &model.Caller{UserID: "testUserID"})
+			c.Set(model.CallerKey, &model.Caller{UserID: "testUserID"})
 			c.Request = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.body))
 
 			h.HandleShorten(c)
@@ -229,7 +238,7 @@ func TestShortenerHandler_APIShorten(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			c, _ := gin.CreateTestContext(w)
-			c.Set("caller", &model.Caller{UserID: "testUserID"})
+			c.Set(model.CallerKey, &model.Caller{UserID: "testUserID"})
 			c.Request = httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(tt.body))
 			c.Request.Header.Set("Content-Type", "application/json")
 

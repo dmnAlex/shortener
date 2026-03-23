@@ -30,6 +30,9 @@ type URLService interface {
 	// DeleteURLs помечает ссылки пользователя как удаленные.
 	// Удаление выполняется асинхронно.
 	DeleteURLs(userID string, shortIDs []string) error
+
+	// Stats возвращает количество URL и пользователей
+	Stats() (int, int, error)
 }
 
 type urlService struct {
@@ -63,4 +66,8 @@ func (s *urlService) Ping() error {
 
 func (s *urlService) DeleteURLs(userID string, shortIDs []string) error {
 	return s.repo.DeleteURLs(userID, shortIDs)
+}
+
+func (s *urlService) Stats() (int, int, error) {
+	return s.repo.Stats()
 }

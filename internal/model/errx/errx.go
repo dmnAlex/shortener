@@ -11,4 +11,5 @@ var (
 	ErrUnprocessable    = errors.New("unprocessable")
 	ErrInternalError    = errors.New("internal server error")
 	ErrGone             = errors.New("gone")
+	ErrUnauthorized     = errors.New("unauthorized")
 )

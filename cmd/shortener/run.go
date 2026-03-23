@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,14 +11,19 @@ import (
 
 	"github.com/dmnAlex/shortener/internal/audit"
 	"github.com/dmnAlex/shortener/internal/config"
+	grpcpb "github.com/dmnAlex/shortener/internal/grpc"
 	"github.com/dmnAlex/shortener/internal/handler"
 	"github.com/dmnAlex/shortener/internal/logger"
+	"github.com/dmnAlex/shortener/internal/middleware"
 	"github.com/dmnAlex/shortener/internal/repository"
+	"github.com/dmnAlex/shortener/internal/router"
 	"github.com/dmnAlex/shortener/internal/service"
 	"github.com/dmnAlex/shortener/internal/storage/pg"
 	"github.com/dmnAlex/shortener/internal/tlsutil"
+	pb "github.com/dmnAlex/shortener/proto"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
 
 func run() error {
@@ -75,11 +81,28 @@ func run() error {
 
 	service := service.NewURLService(repo)
 	handler := handler.NewShortenerHandler(service, cfg, auditMgr)
-	router := newRouter(handler, cfg)
+	router := router.New(handler, cfg)
 
 	srv := &http.Server{
 		Addr:    cfg.LaunchAddress.String(),
 		Handler: router,
+	}
+
+	var grpcSrv *grpc.Server
+	if cfg.GRPCAddress != "" {
+		grpcSrv = grpc.NewServer(grpc.UnaryInterceptor(middleware.GRPCAuth(cfg)))
+		grpcHandler := grpcpb.NewShortenerServer(service, cfg, auditMgr)
+		pb.RegisterShortenerServiceServer(grpcSrv, grpcHandler)
+
+		listen, err := net.Listen("tcp", cfg.GRPCAddress)
+		if err != nil {
+			return errors.Wrap(err, "grpc listen")
+		}
+		go func() {
+			if err := grpcSrv.Serve(listen); err != nil && err != grpc.ErrServerStopped {
+				logger.Log.Error("grpc server error", zap.Error(err))
+			}
+		}()
 	}
 
 	var certFile, keyFile string
@@ -131,6 +154,10 @@ func run() error {
 
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Log.Error("Server shutdown:", zap.Error(err))
+	}
+
+	if grpcSrv != nil {
+		grpcSrv.GracefulStop()
 	}
 
 	if pprofSrv != nil {

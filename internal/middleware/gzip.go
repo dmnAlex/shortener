@@ -1,4 +1,4 @@
-package gzip
+package middleware
 
 import (
 	"compress/gzip"
@@ -29,7 +29,7 @@ func (g *gzipWriter) Close() error {
 	return g.w.Close()
 }
 
-func GzipDecompressMiddleware() gin.HandlerFunc {
+func GzipDecompress() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if strings.Contains(c.GetHeader("Content-Encoding"), "gzip") {
 			reader, err := gzip.NewReader(c.Request.Body)
@@ -46,7 +46,7 @@ func GzipDecompressMiddleware() gin.HandlerFunc {
 	}
 }
 
-func GzipCompressMiddleware() gin.HandlerFunc {
+func GzipCompress() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") {
 

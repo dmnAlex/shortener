@@ -1,0 +1,88 @@
+package middleware
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"strings"
+
+	"github.com/dmnAlex/shortener/internal/config"
+	"github.com/dmnAlex/shortener/internal/model"
+	"github.com/dmnAlex/shortener/internal/model/errx"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+)
+
+const (
+	authTokenName = "auth_token"
+)
+
+func Auth(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		cookie, err := c.Cookie(authTokenName)
+		var claims *model.Claims
+		if err != nil || cookie == "" {
+			claims = &model.Claims{
+				UserID: uuid.NewString(),
+			}
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+			signedToken, err := token.SignedString([]byte(cfg.JWTSecret))
+			if err != nil {
+				c.String(http.StatusInternalServerError, "internal error")
+				c.Abort()
+				return
+			}
+			c.SetCookie(authTokenName, signedToken, 0, "/", "", false, true)
+		} else {
+			claims = &model.Claims{}
+			tkn, err := jwt.ParseWithClaims(cookie, claims, func(t *jwt.Token) (interface{}, error) {
+				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+				}
+				return []byte(cfg.JWTSecret), nil
+			})
+			if err != nil || !tkn.Valid || claims.UserID == "" {
+				c.String(http.StatusUnauthorized, "unauthorized")
+				c.Abort()
+				return
+			}
+		}
+		c.Set(model.CallerKey, &model.Caller{UserID: claims.UserID})
+		c.Next()
+	}
+}
+
+func GRPCAuth(cfg *config.Config) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return nil, status.Error(codes.Unauthenticated, errx.ErrUnauthorized.Error())
+		}
+
+		values := md.Get("authorization")
+		if len(values) == 0 {
+			return nil, status.Error(codes.Unauthenticated, errx.ErrUnauthorized.Error())
+		}
+
+		tokenStr := strings.TrimPrefix(values[0], "Bearer ")
+
+		claims := &model.Claims{}
+		tkn, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			}
+			return []byte(cfg.JWTSecret), nil
+		})
+		if err != nil || !tkn.Valid || claims.UserID == "" {
+			return nil, status.Error(codes.Unauthenticated, errx.ErrUnauthorized.Error())
+		}
+
+		ctx = context.WithValue(ctx, model.CallerKey, &model.Caller{UserID: claims.UserID})
+		return handler(ctx, req)
+	}
+}
